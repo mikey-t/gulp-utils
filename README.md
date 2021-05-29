@@ -45,8 +45,13 @@ exports.syncEnvFiles = syncEnvFiles
 Example gulp task calling docker-compose:
 
 ```JavaScript
+const spawnOptions = {...defaultSpawnOptions}
+
+const dockerDirPath = 'docker/'
 const dockerDepsProjectName = 'your_project'
 const dockerDepsComposeName = 'docker-compose.deps.yml'
+
+const dockerSpawnOptions = {...spawnOptions, cwd: path.resolve(__dirname, dockerDirPath)}
 
 async function dockerDepsUpDetached() {
   return waitForProcess(spawn('docker-compose', ['--project-name', dockerDepsProjectName, '-f', dockerDepsComposeName, 'up', '-d'], dockerSpawnOptions))
