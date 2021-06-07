@@ -1,7 +1,8 @@
 const fs = require('fs')
 const fsp = require('fs').promises
+const which = require('which')
 
-exports.waitForProcess = function(childProcess) {
+exports.waitForProcess = function (childProcess) {
   return new Promise((resolve, reject) => {
     childProcess.once('exit', (returnCode) => {
       if (returnCode === 0) {
@@ -16,11 +17,11 @@ exports.waitForProcess = function(childProcess) {
   })
 }
 
-exports.copyNewEnvValues = async function(fromPath, toPath) {
+exports.copyNewEnvValues = async function (fromPath, toPath) {
   await copyEnv(fromPath, toPath, false)
 }
 
-exports.overwriteEnvFile = async function(fromPath, toPath) {
+exports.overwriteEnvFile = async function (fromPath, toPath) {
   await copyEnv(fromPath, toPath)
 }
 
@@ -30,7 +31,62 @@ exports.defaultSpawnOptions = {
   stdio: ['ignore', 'inherit', 'inherit']
 }
 
-copyEnv = async function(fromPath, toPath, overrideAll = true) {
+exports.throwIfDockerNotRunning = async function () {
+  if (!which.sync('docker')) {
+    throw Error('docker command not found')
+  }
+
+  let childProcess = spawnSync('docker', ['info'], { encoding: 'utf8' })
+  if (childProcess.error) {
+    throw childProcess.error
+  }
+  if (!childProcess.stdout || childProcess.stdout.includes('ERROR: error during connect')) {
+    throw Error('docker is not running')
+  }
+}
+
+exports.bashIntoRunningDockerContainer = async function (containerNamePartial, entryPoint = 'bash') {
+  await throwIfDockerNotRunning()
+
+  let childProcess = spawnSync('docker', ['container', 'ls'], { encoding: 'utf8' })
+  if (childProcess.error) {
+    throw childProcess.error
+  }
+
+  let matchingLines = childProcess.stdout.split('\n').filter(line => line.includes(containerNamePartial))
+
+  if (!matchingLines || matchingLines.length === 0) {
+    throw Error('container is not running')
+  }
+
+  if (matchingLines.length > 1) {
+    throw Error('more than one container matches the provided containerNamePartial ' + containerNamePartial)
+  }
+
+  let stringArray = matchingLines[0].split(/(\s+)/)
+
+  let containerName = stringArray[stringArray.length - 1]
+
+  console.log('full container name: ' + containerName)
+
+  const args = ['exec', '-it', containerName, entryPoint]
+  return waitForProcess(spawn('docker', args, spawnOptionsWithInput))
+}
+
+exports.dockerContainerIsRunning = async function(containerNamePartial) {
+  await throwIfDockerNotRunning()
+
+  let childProcess = spawnSync('docker', ['container', 'ls'], { encoding: 'utf8' })
+  if (childProcess.error) {
+    throw childProcess.error
+  }
+
+  let matchingLines = childProcess.stdout.split('\n').filter(l => l.includes(containerNamePartial))
+
+  return !!matchingLines && matchingLines.length > 0
+}
+
+copyEnv = async function (fromPath, toPath, overrideAll = true) {
   await ensureFile(fromPath, toPath)
 
   let templateDict = getEnvDictionary(fromPath)

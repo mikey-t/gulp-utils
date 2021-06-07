@@ -40,7 +40,7 @@ async function syncEnvFiles() {
 exports.syncEnvFiles = syncEnvFiles
 ```
 
-> **WARNING**: Be sure to .gitignore `.env`, `.env.server` and `.env.client` files in the root **AND** the location they're being copied to. Only the template files with placeholder values should go in source control.
+> **WARNING**: Be sure to .gitignore `.env`, `.env.server` and `.env.client` files in the root **AND** the location they're being copied to. Only the template files with placeholder values should go in source control. For example, your .gitignore could have `**/.env*` and then `!.env.server.template` and `!.env.client.template`, etc.
 
 Example gulp task calling docker-compose:
 
@@ -59,3 +59,44 @@ async function dockerDepsUpDetached() {
 
 exports.dockerDepsUpDetached = series(syncEnvFiles, dockerDepsUpDetached)
 ```
+
+Example gulp task using util method `throwIfDockerNotRunning`:
+
+
+```JavaScript
+async function dockerDepsUp() {
+  await throwIfDockerNotRunning()
+  return waitForProcess(spawn('docker-compose', ['--project-name', dockerDepsProjectName, '-f', dockerDepsComposeName, 'up'], dockerSpawnOptions))
+}
+
+exports.dockerDepsUp = series(syncEnvFiles, dockerDepsUp)
+```
+
+Example gulp task using util method `dockerContainerIsRunning`:
+
+```JavaScript
+async function throwIfDockerDepsNotUp() {
+  const postgresIsRunning = await dockerContainerIsRunning(`${dockerDepsProjectName}_postgresql`)
+  if (!postgresIsRunning) {
+    throw 'Docker dependencies are not running'
+  }
+}
+
+async function runDbMigrator() {
+  return waitForProcess(spawn('dotnet', [`publish/${DotnetNamespace}.DbMigrator.dll`], migratorSpawnOptions))
+}
+
+exports.dbMigrate = series(throwIfDockerDepsNotUp, parallel(syncEnvFiles, deleteMigratorPublishDir), publishMigrator, runDbMigrator)
+```
+
+Example gulp task using util method `bashIntoRunningDockerContainer` and `argv` to pass in param `--imageName`:
+
+```JavaScript
+async function dockerBashRunningContainer() {
+  await throwIfDockerNotRunning()
+  await bashIntoRunningDockerContainer(`${dockerDepsProjectName}_${argv['imageName']}`)
+}
+
+exports.dockerBash = dockerBashRunningContainer
+```
+
