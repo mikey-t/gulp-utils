@@ -1,8 +1,16 @@
 const fs = require('fs')
 const fsp = require('fs').promises
 const which = require('which')
+const {spawn, spawnSync} = require('child_process')
 
-exports.waitForProcess = function (childProcess) {
+const defaultSpawnOptions = {
+  shell: true,
+  cwd: __dirname,
+  stdio: ['ignore', 'inherit', 'inherit']
+}
+const spawnOptionsWithInput = {...defaultSpawnOptions, stdio: 'inherit'}
+
+function waitForProcess(childProcess) {
   return new Promise((resolve, reject) => {
     childProcess.once('exit', (returnCode) => {
       if (returnCode === 0) {
@@ -17,26 +25,21 @@ exports.waitForProcess = function (childProcess) {
   })
 }
 
-exports.copyNewEnvValues = async function (fromPath, toPath) {
+async function copyNewEnvValues(fromPath, toPath) {
   await copyEnv(fromPath, toPath, false)
 }
 
-exports.overwriteEnvFile = async function (fromPath, toPath) {
+async function overwriteEnvFile(fromPath, toPath) {
   await copyEnv(fromPath, toPath)
 }
 
-exports.defaultSpawnOptions = {
-  shell: true,
-  cwd: __dirname,
-  stdio: ['ignore', 'inherit', 'inherit']
-}
 
-exports.throwIfDockerNotRunning = async function () {
+async function throwIfDockerNotRunning() {
   if (!which.sync('docker')) {
     throw Error('docker command not found')
   }
 
-  let childProcess = spawnSync('docker', ['info'], { encoding: 'utf8' })
+  let childProcess = spawnSync('docker', ['info'], {encoding: 'utf8'})
   if (childProcess.error) {
     throw childProcess.error
   }
@@ -45,10 +48,10 @@ exports.throwIfDockerNotRunning = async function () {
   }
 }
 
-exports.bashIntoRunningDockerContainer = async function (containerNamePartial, entryPoint = 'bash') {
+async function bashIntoRunningDockerContainer(containerNamePartial, entryPoint = 'bash') {
   await throwIfDockerNotRunning()
 
-  let childProcess = spawnSync('docker', ['container', 'ls'], { encoding: 'utf8' })
+  let childProcess = spawnSync('docker', ['container', 'ls'], {encoding: 'utf8'})
   if (childProcess.error) {
     throw childProcess.error
   }
@@ -73,10 +76,10 @@ exports.bashIntoRunningDockerContainer = async function (containerNamePartial, e
   return waitForProcess(spawn('docker', args, spawnOptionsWithInput))
 }
 
-exports.dockerContainerIsRunning = async function(containerNamePartial) {
+async function dockerContainerIsRunning(containerNamePartial) {
   await throwIfDockerNotRunning()
 
-  let childProcess = spawnSync('docker', ['container', 'ls'], { encoding: 'utf8' })
+  let childProcess = spawnSync('docker', ['container', 'ls'], {encoding: 'utf8'})
   if (childProcess.error) {
     throw childProcess.error
   }
@@ -86,7 +89,7 @@ exports.dockerContainerIsRunning = async function(containerNamePartial) {
   return !!matchingLines && matchingLines.length > 0
 }
 
-copyEnv = async function (fromPath, toPath, overrideAll = true) {
+async function copyEnv(fromPath, toPath, overrideAll = true) {
   await ensureFile(fromPath, toPath)
 
   let templateDict = getEnvDictionary(fromPath)
@@ -148,3 +151,17 @@ async function ensureFile(fromPath, toPath) {
     await fsp.copyFile(fromPath, toPath)
   }
 }
+
+exports.defaultSpawnOptions = {
+  shell: true,
+  cwd: __dirname,
+  stdio: ['ignore', 'inherit', 'inherit']
+}
+
+exports.defaultSpawnOptions = defaultSpawnOptions
+exports.waitForProcess = waitForProcess
+exports.copyNewEnvValues = copyNewEnvValues
+exports.overwriteEnvFile = overwriteEnvFile
+exports.throwIfDockerNotRunning = throwIfDockerNotRunning
+exports.bashIntoRunningDockerContainer = bashIntoRunningDockerContainer
+exports.dockerContainerIsRunning = dockerContainerIsRunning
