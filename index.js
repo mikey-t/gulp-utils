@@ -5,7 +5,6 @@ const {spawn, spawnSync} = require('child_process')
 
 const defaultSpawnOptions = {
   shell: true,
-  cwd: __dirname,
   stdio: ['ignore', 'inherit', 'inherit']
 }
 const spawnOptionsWithInput = {...defaultSpawnOptions, stdio: 'inherit'}
