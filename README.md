@@ -1,6 +1,6 @@
-# @mikeyt23/gulp-utils
+# @mikeyt23/node-cli-utils
 
-Simple gulp utils to:
+Simple node cli utils to:
 
 - Wait for a node spawned process
 - Copy env template file to env file
