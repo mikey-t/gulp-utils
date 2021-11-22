@@ -1,7 +1,10 @@
 const fs = require('fs')
+const fse = require('fs-extra')
 const fsp = require('fs').promises
 const which = require('which')
 const {spawn, spawnSync} = require('child_process')
+const path = require('path')
+const tar = require('tar')
 
 const defaultSpawnOptions = {
   shell: true,
@@ -157,6 +160,36 @@ exports.defaultSpawnOptions = {
   stdio: ['ignore', 'inherit', 'inherit']
 }
 
+async function createTarball(directoryToTarball, outputDirectory, tarballName) {
+  if (!directoryToTarball || directoryToTarball.length === 0) {
+    throw new Error('directoryToTarball is required')
+  }
+  if (!outputDirectory || outputDirectory.length === 0) {
+    throw new Error('outputDirectory is required')
+  }
+  if (!tarballName || tarballName.length === 0) {
+    throw new Error('tarballName is required')
+  }
+  
+  const tarballPath = path.join(outputDirectory, tarballName)
+  
+  console.log('directory to create tarball from: ' + directoryToTarball)
+  console.log('output will be:' + tarballPath)
+  
+  if (!fs.existsSync(directoryToTarball)) {
+    throw new Error('error: dirToTarball directory does not exist')
+  }
+  
+  if (!fs.existsSync(outputDirectory)) {
+    fs.mkdirSync(outputDirectory)
+  } else {
+    fse.emptyDirSync(outputDirectory)
+  }
+  
+  await tar.c({gzip: true, file: tarballPath}, [directoryToTarball])
+}
+
+
 exports.defaultSpawnOptions = defaultSpawnOptions
 exports.waitForProcess = waitForProcess
 exports.copyNewEnvValues = copyNewEnvValues
@@ -164,3 +197,4 @@ exports.overwriteEnvFile = overwriteEnvFile
 exports.throwIfDockerNotRunning = throwIfDockerNotRunning
 exports.bashIntoRunningDockerContainer = bashIntoRunningDockerContainer
 exports.dockerContainerIsRunning = dockerContainerIsRunning
+exports.createTarball = createTarball
