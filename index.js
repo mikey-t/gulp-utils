@@ -2,7 +2,7 @@ const fs = require('fs')
 const fse = require('fs-extra')
 const fsp = require('fs').promises
 const which = require('which')
-const {spawn, spawnSync} = require('child_process')
+const { spawn, spawnSync } = require('child_process')
 const path = require('path')
 const tar = require('tar')
 
@@ -10,7 +10,7 @@ const defaultSpawnOptions = {
   shell: true,
   stdio: ['ignore', 'inherit', 'inherit']
 }
-const spawnOptionsWithInput = {...defaultSpawnOptions, stdio: 'inherit'}
+const spawnOptionsWithInput = { ...defaultSpawnOptions, stdio: 'inherit' }
 
 function waitForProcess(childProcess) {
   return new Promise((resolve, reject) => {
@@ -41,7 +41,7 @@ async function throwIfDockerNotRunning() {
     throw Error('docker command not found')
   }
 
-  let childProcess = spawnSync('docker', ['info'], {encoding: 'utf8'})
+  let childProcess = spawnSync('docker', ['info'], { encoding: 'utf8' })
   if (childProcess.error) {
     throw childProcess.error
   }
@@ -53,7 +53,7 @@ async function throwIfDockerNotRunning() {
 async function bashIntoRunningDockerContainer(containerNamePartial, entryPoint = 'bash') {
   await throwIfDockerNotRunning()
 
-  let childProcess = spawnSync('docker', ['container', 'ls'], {encoding: 'utf8'})
+  let childProcess = spawnSync('docker', ['container', 'ls'], { encoding: 'utf8' })
   if (childProcess.error) {
     throw childProcess.error
   }
@@ -81,7 +81,7 @@ async function bashIntoRunningDockerContainer(containerNamePartial, entryPoint =
 async function dockerContainerIsRunning(containerNamePartial) {
   await throwIfDockerNotRunning()
 
-  let childProcess = spawnSync('docker', ['container', 'ls'], {encoding: 'utf8'})
+  let childProcess = spawnSync('docker', ['container', 'ls'], { encoding: 'utf8' })
   if (childProcess.error) {
     throw childProcess.error
   }
@@ -170,25 +170,64 @@ async function createTarball(directoryToTarball, outputDirectory, tarballName) {
   if (!tarballName || tarballName.length === 0) {
     throw new Error('tarballName is required')
   }
-  
+
   const tarballPath = path.join(outputDirectory, tarballName)
-  
+
   console.log('directory to create tarball from: ' + directoryToTarball)
-  console.log('output will be:' + tarballPath)
-  
+  console.log('output will be: ' + tarballPath)
+
   if (!fs.existsSync(directoryToTarball)) {
     throw new Error('error: dirToTarball directory does not exist')
   }
-  
+
   if (!fs.existsSync(outputDirectory)) {
     fs.mkdirSync(outputDirectory)
   } else {
     fse.emptyDirSync(outputDirectory)
   }
-  
-  await tar.c({gzip: true, file: tarballPath}, [directoryToTarball])
+
+  await tar.c({ gzip: true, file: tarballPath }, [directoryToTarball])
 }
 
+async function dockerCompose(command, projectName, dockerRelativeDirectory, detached = false) {
+  if (!projectName || projectName.length === 0) {
+    throw new Error('projectName is required')
+  }
+
+  const dockerRelativeDir = dockerRelativeDirectory || 'docker'
+  const dockerWorkingDir = path.join(process.cwd(), dockerRelativeDir)
+
+  if (!fs.existsSync(dockerWorkingDir)) {
+    throw new Error('Docker directory does not exist: ' + dockerWorkingDir)
+  }
+
+  await throwIfDockerNotRunning()
+
+  const dockerSpawnOptions = { ...defaultSpawnOptions, cwd: dockerWorkingDir }
+
+  let args = ['--project-name', projectName, command]
+  if (detached) {
+    args.push('-d')
+  }
+
+  return waitForProcess(spawn('docker-compose', args, dockerSpawnOptions))
+}
+
+async function dockerDepsUp(projectName, dockerRelativeDirectory) {
+  return dockerCompose('up', projectName, dockerRelativeDirectory)
+}
+
+async function dockerDepsUpDetached(projectName, dockerRelativeDirectory) {
+  return dockerCompose('up', projectName, dockerRelativeDirectory, true)
+}
+
+async function dockerDepsDown(projectName, dockerRelativeDirectory) {
+  return dockerCompose('down', projectName, dockerRelativeDirectory)
+}
+
+async function dockerDepsStop(projectName, dockerRelativeDirectory) {
+  return dockerCompose('stop', projectName, dockerRelativeDirectory)
+}
 
 exports.defaultSpawnOptions = defaultSpawnOptions
 exports.waitForProcess = waitForProcess
@@ -198,3 +237,7 @@ exports.throwIfDockerNotRunning = throwIfDockerNotRunning
 exports.bashIntoRunningDockerContainer = bashIntoRunningDockerContainer
 exports.dockerContainerIsRunning = dockerContainerIsRunning
 exports.createTarball = createTarball
+exports.dockerDepsUp = dockerDepsUp
+exports.dockerDepsUpDetached = dockerDepsUpDetached
+exports.dockerDepsDown = dockerDepsDown
+exports.dockerDepsStop = dockerDepsStop
