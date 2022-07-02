@@ -160,7 +160,7 @@ exports.defaultSpawnOptions = {
   stdio: ['ignore', 'inherit', 'inherit']
 }
 
-async function createTarball(directoryToTarball, outputDirectory, tarballName) {
+async function createTarball(directoryToTarball, outputDirectory, tarballName, cwd = '') {
   if (!directoryToTarball || directoryToTarball.length === 0) {
     throw new Error('directoryToTarball is required')
   }
@@ -176,17 +176,26 @@ async function createTarball(directoryToTarball, outputDirectory, tarballName) {
   console.log('directory to create tarball from: ' + directoryToTarball)
   console.log('output will be: ' + tarballPath)
 
-  if (!fs.existsSync(directoryToTarball)) {
-    throw new Error('error: dirToTarball directory does not exist')
+  let normalizedDirectoryToTarball = !!cwd ? path.join(cwd, directoryToTarball) : directoryToTarball
+  
+  if (!fs.existsSync(normalizedDirectoryToTarball)) {
+    throw new Error('error: dirToTarball directory does not exist: ' + normalizedDirectoryToTarball)
   }
 
   if (!fs.existsSync(outputDirectory)) {
     fs.mkdirSync(outputDirectory)
   } else {
-    fse.emptyDirSync(outputDirectory)
+    if (fs.existsSync(tarballPath)) {
+      fs.unlinkSync(tarballPath)
+    }
+  }
+  
+  let options = { gzip: true, file: tarballPath }
+  if (!!cwd) {
+    options.cwd = cwd
   }
 
-  await tar.c({ gzip: true, file: tarballPath }, [directoryToTarball])
+  await tar.c(options, [directoryToTarball])
 }
 
 async function dockerCompose(command, projectName, dockerRelativeDirectory, detached = false) {

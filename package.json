@@ -1,6 +1,6 @@
 {
   "name": "@mikeyt23/node-cli-utils",
-  "version": "1.2.0",
+  "version": "1.2.5",
   "description": "Some node cli utility functions",
   "author": "Mike Thompson",
   "license": "MIT",
