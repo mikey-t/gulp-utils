@@ -1,5 +1,4 @@
 const fs = require('fs')
-const fse = require('fs-extra')
 const fsp = require('fs').promises
 const which = require('which')
 const { spawn, spawnSync } = require('child_process')
@@ -177,7 +176,7 @@ async function createTarball(directoryToTarball, outputDirectory, tarballName, c
   console.log('output will be: ' + tarballPath)
 
   let normalizedDirectoryToTarball = !!cwd ? path.join(cwd, directoryToTarball) : directoryToTarball
-  
+
   if (!fs.existsSync(normalizedDirectoryToTarball)) {
     throw new Error('error: dirToTarball directory does not exist: ' + normalizedDirectoryToTarball)
   }
@@ -189,7 +188,7 @@ async function createTarball(directoryToTarball, outputDirectory, tarballName, c
       fs.unlinkSync(tarballPath)
     }
   }
-  
+
   let options = { gzip: true, file: tarballPath }
   if (!!cwd) {
     options.cwd = cwd
@@ -238,6 +237,68 @@ async function dockerDepsStop(projectName, dockerRelativeDirectory) {
   return dockerCompose('stop', projectName, dockerRelativeDirectory)
 }
 
+async function dotnetBuild(release = true) {
+  let args = ['build']
+  if (release) {
+    args.push('-c', 'Release')
+  }
+
+  return waitForProcess(spawn('dotnet', args, defaultSpawnOptions))
+}
+
+async function dotnetPack(projectDirectoryPath, release = true) {
+  if (!projectDirectoryPath) {
+    throw Error('projectDirectoryPath param is required')
+  }
+
+  let args = ['pack']
+  if (release === true) {
+    args.push('-c', 'Release')
+  }
+
+  const spawnOptions = { ...defaultSpawnOptions, cwd: projectDirectoryPath }
+  logCommand('dotnet', args, spawnOptions)
+  await waitForProcess(spawn('dotnet', args, spawnOptions))
+}
+
+async function dotnetNugetPublish(projectDirectoryPath, csprojFilename, release = true, nugetSource = 'https://api.nuget.org/v3/index.json') {
+  const apiKey = process.env.NUGET_API_KEY
+  if (!apiKey) {
+    throw Error('env var NUGET_API_KEY is required')
+  }
+
+  const packageDir = path.join(projectDirectoryPath, release ? 'bin/Release' : 'bin/Debug')
+
+  const packageName = await getPackageName(projectDirectoryPath, csprojFilename)
+  console.log('publishing package ' + packageName)
+  const spawnOptions = { ...defaultSpawnOptions, cwd: packageDir }
+  await waitForProcess(spawn('dotnet', [
+    'nuget',
+    'push',
+    packageName,
+    '--api-key',
+    apiKey,
+    '--source',
+    nugetSource], spawnOptions))
+}
+
+async function getPackageName(projectPath, csprojFilename) {
+  const namespace = csprojFilename.substring(0, csprojFilename.indexOf('.csproj'))
+  const csprojPath = path.join(projectPath, csprojFilename)
+  const csproj = fs.readFileSync(csprojPath, 'utf-8')
+  const versionTag = '<PackageVersion>'
+  const xmlVersionTagIndex = csproj.indexOf(versionTag)
+  const versionStartIndex = xmlVersionTagIndex + versionTag.length
+  const versionStopIndex = csproj.indexOf('<', versionStartIndex)
+  const version = csproj.substring(versionStartIndex, versionStopIndex)
+  return `${namespace}.${version}.nupkg`
+}
+
+async function logCommand(command, args, spawnOptions) {
+  console.log('running command: ' + `${command} ${args.join(' ')}`)
+  console.log('with spawn options: ' + JSON.stringify(spawnOptions))
+}
+
 exports.defaultSpawnOptions = defaultSpawnOptions
 exports.waitForProcess = waitForProcess
 exports.copyNewEnvValues = copyNewEnvValues
@@ -250,3 +311,6 @@ exports.dockerDepsUp = dockerDepsUp
 exports.dockerDepsUpDetached = dockerDepsUpDetached
 exports.dockerDepsDown = dockerDepsDown
 exports.dockerDepsStop = dockerDepsStop
+exports.dotnetBuild = dotnetBuild
+exports.dotnetPack = dotnetPack
+exports.dotnetNugetPublish = dotnetNugetPublish
