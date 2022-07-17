@@ -6,10 +6,15 @@ Simple node cli utils to:
 - Copy env template file to env file
 - Sync new env values from template to "real" env files
 - Manage all env values in root files that then get copied to other locations
+- Dotnet helper methods:
+  - Pack and publish a NuGet package
+  - Wrapper commands to install or update dotnet ef tool
+  - Wrapper commands to spawn dotnet run and publish
+  - Helper methods for DB migration commands (see [mikey-t/db-migrations-dotnet](https://github.com/mikey-t/db-migrations-dotnet))
 
 # Env Utility Function Notes
 
-A project can have multiple locations that requires the same env values. For example, you might have a database that needs to be used by a docker project, your main app and also a db migration project. Rather than having to remember where each of the .env files is, we want to use the root directory and overwrite subdirectory env files with the ones in the root. We also want to add new `.env.template` values to the root `.env` files and propagate them to subdirectories - all without having to know about anything about any of the .env files except the ones in the root of the project.
+A project can have multiple locations that require the same env values. For example, you might have a database that needs to be used by a docker project, your main app and also a db migration project. Rather than having to remember where each of the .env files is, we want to use the root directory and overwrite subdirectory env files with the ones in the root. We also want to add new `.env.template` values to the root `.env` files and propagate them to subdirectories - all without having to know about anything about any of the .env files except the ones in the root of the project.
 
 # Examples
 

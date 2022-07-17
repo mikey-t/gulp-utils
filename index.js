@@ -1,7 +1,7 @@
 const fs = require('fs')
 const fsp = require('fs').promises
 const which = require('which')
-const { spawn, spawnSync } = require('child_process')
+const {spawn, spawnSync} = require('child_process')
 const path = require('path')
 const tar = require('tar')
 
@@ -9,7 +9,7 @@ const defaultSpawnOptions = {
   shell: true,
   stdio: ['ignore', 'inherit', 'inherit']
 }
-const spawnOptionsWithInput = { ...defaultSpawnOptions, stdio: 'inherit' }
+const defaultSpawnOptionsWithInput = {...defaultSpawnOptions, stdio: 'inherit'}
 
 function waitForProcess(childProcess) {
   return new Promise((resolve, reject) => {
@@ -34,13 +34,12 @@ async function overwriteEnvFile(fromPath, toPath) {
   await copyEnv(fromPath, toPath)
 }
 
-
 async function throwIfDockerNotRunning() {
   if (!which.sync('docker')) {
     throw Error('docker command not found')
   }
 
-  let childProcess = spawnSync('docker', ['info'], { encoding: 'utf8' })
+  let childProcess = spawnSync('docker', ['info'], {encoding: 'utf8'})
   if (childProcess.error) {
     throw childProcess.error
   }
@@ -52,7 +51,7 @@ async function throwIfDockerNotRunning() {
 async function bashIntoRunningDockerContainer(containerNamePartial, entryPoint = 'bash') {
   await throwIfDockerNotRunning()
 
-  let childProcess = spawnSync('docker', ['container', 'ls'], { encoding: 'utf8' })
+  let childProcess = spawnSync('docker', ['container', 'ls'], {encoding: 'utf8'})
   if (childProcess.error) {
     throw childProcess.error
   }
@@ -74,13 +73,13 @@ async function bashIntoRunningDockerContainer(containerNamePartial, entryPoint =
   console.log('full container name: ' + containerName)
 
   const args = ['exec', '-it', containerName, entryPoint]
-  return waitForProcess(spawn('docker', args, spawnOptionsWithInput))
+  return waitForProcess(spawn('docker', args, defaultSpawnOptionsWithInput))
 }
 
 async function dockerContainerIsRunning(containerNamePartial) {
   await throwIfDockerNotRunning()
 
-  let childProcess = spawnSync('docker', ['container', 'ls'], { encoding: 'utf8' })
+  let childProcess = spawnSync('docker', ['container', 'ls'], {encoding: 'utf8'})
   if (childProcess.error) {
     throw childProcess.error
   }
@@ -189,7 +188,7 @@ async function createTarball(directoryToTarball, outputDirectory, tarballName, c
     }
   }
 
-  let options = { gzip: true, file: tarballPath }
+  let options = {gzip: true, file: tarballPath}
   if (!!cwd) {
     options.cwd = cwd
   }
@@ -197,12 +196,12 @@ async function createTarball(directoryToTarball, outputDirectory, tarballName, c
   await tar.c(options, [directoryToTarball])
 }
 
-async function dockerCompose(command, projectName, dockerRelativeDirectory, detached = false) {
+async function dockerCompose(command, projectName, dockerRelativeDirectory = 'docker', detached = false) {
   if (!projectName || projectName.length === 0) {
     throw new Error('projectName is required')
   }
 
-  const dockerRelativeDir = dockerRelativeDirectory || 'docker'
+  const dockerRelativeDir = dockerRelativeDirectory || './'
   const dockerWorkingDir = path.join(process.cwd(), dockerRelativeDir)
 
   if (!fs.existsSync(dockerWorkingDir)) {
@@ -211,7 +210,7 @@ async function dockerCompose(command, projectName, dockerRelativeDirectory, deta
 
   await throwIfDockerNotRunning()
 
-  const dockerSpawnOptions = { ...defaultSpawnOptions, cwd: dockerWorkingDir }
+  const dockerSpawnOptions = {...defaultSpawnOptions, cwd: dockerWorkingDir, stdio: 'inherit'}
 
   let args = ['--project-name', projectName, command]
   if (detached) {
@@ -222,19 +221,19 @@ async function dockerCompose(command, projectName, dockerRelativeDirectory, deta
 }
 
 async function dockerDepsUp(projectName, dockerRelativeDirectory) {
-  return dockerCompose('up', projectName, dockerRelativeDirectory)
+  return await dockerCompose('up', projectName, dockerRelativeDirectory)
 }
 
 async function dockerDepsUpDetached(projectName, dockerRelativeDirectory) {
-  return dockerCompose('up', projectName, dockerRelativeDirectory, true)
+  return await dockerCompose('up', projectName, dockerRelativeDirectory, true)
 }
 
 async function dockerDepsDown(projectName, dockerRelativeDirectory) {
-  return dockerCompose('down', projectName, dockerRelativeDirectory)
+  return await dockerCompose('down', projectName, dockerRelativeDirectory)
 }
 
 async function dockerDepsStop(projectName, dockerRelativeDirectory) {
-  return dockerCompose('stop', projectName, dockerRelativeDirectory)
+  return await dockerCompose('stop', projectName, dockerRelativeDirectory)
 }
 
 async function dotnetBuild(release = true) {
@@ -256,7 +255,7 @@ async function dotnetPack(projectDirectoryPath, release = true) {
     args.push('-c', 'Release')
   }
 
-  const spawnOptions = { ...defaultSpawnOptions, cwd: projectDirectoryPath }
+  const spawnOptions = {...defaultSpawnOptions, cwd: projectDirectoryPath}
   logCommand('dotnet', args, spawnOptions)
   await waitForProcess(spawn('dotnet', args, spawnOptions))
 }
@@ -271,7 +270,7 @@ async function dotnetNugetPublish(projectDirectoryPath, csprojFilename, release 
 
   const packageName = await getPackageName(projectDirectoryPath, csprojFilename)
   console.log('publishing package ' + packageName)
-  const spawnOptions = { ...defaultSpawnOptions, cwd: packageDir }
+  const spawnOptions = {...defaultSpawnOptions, cwd: packageDir}
   await waitForProcess(spawn('dotnet', [
     'nuget',
     'push',
@@ -294,12 +293,89 @@ async function getPackageName(projectPath, csprojFilename) {
   return `${namespace}.${version}.nupkg`
 }
 
-async function logCommand(command, args, spawnOptions) {
+function logCommand(command, args, spawnOptions) {
   console.log('running command: ' + `${command} ${args.join(' ')}`)
   console.log('with spawn options: ' + JSON.stringify(spawnOptions))
 }
 
+async function dotnetDllCommand(relativeDllPath, argsArray, cwd = null, useStdin = false) {
+  throwIfRequiredIsFalsy(relativeDllPath, 'relativeDllPath')
+  throwIfRequiredArrayIsFalsyOrEmpty(argsArray, 'argsArray')
+
+  let args = [relativeDllPath, ...argsArray]
+
+  let spawnOptions = {...defaultSpawnOptions}
+  if (cwd !== null) {
+    spawnOptions = {...spawnOptions, cwd: cwd}
+  }
+  if (useStdin) {
+    spawnOptions = {...spawnOptions, stdio: 'inherit'}
+  }
+
+  return waitForProcess(spawn('dotnet', args, spawnOptions))
+}
+
+async function dotnetPublish(cwd = null, outputDir = 'publish') {
+  let spawnOptions = {...defaultSpawnOptions}
+  if (!!cwd) {
+    spawnOptions = {...spawnOptions, cwd: cwd}
+  }
+  if (!outputDir) {
+    outputDir = 'publish'
+  }
+  let args = ['publish', '-o', outputDir]
+  return waitForProcess(spawn('dotnet', args, spawnOptions))
+}
+
+async function dotnetDbMigrationsList(dbContextName, relativeDbMigratorDirectoryPath) {
+  throwIfRequiredIsFalsy(dbContextName, 'dbContextName')
+  throwIfRequiredIsFalsy(relativeDbMigratorDirectoryPath, 'relativeDbMigratorDirectoryPath')
+  let spawnOptions = {...defaultSpawnOptions, cwd: relativeDbMigratorDirectoryPath}
+  return waitForProcess(spawn('dotnet', ['ef', 'migrations', 'list', '--context', dbContextName], spawnOptions))
+}
+
+async function dotnetDbMigrate(dbContextName, relativeDbMigratorDirectoryPath, migrationName = '') {
+  throwIfRequiredIsFalsy(dbContextName, 'dbContextName')
+  throwIfRequiredIsFalsy(relativeDbMigratorDirectoryPath, 'relativeDbMigratorDirectoryPath')
+  let args = ['ef', 'database', 'update']
+  if (!!migrationName) {
+    args.push(migrationName)
+  }
+  args = [...args, '--context', dbContextName]
+  let spawnOptions = {...defaultSpawnOptions, cwd: relativeDbMigratorDirectoryPath}
+  return waitForProcess(spawn('dotnet', args, spawnOptions))
+}
+
+async function dotnetDbAddMigration(dbContextName, relativeDbMigratorDirectoryPath, migrationName) {
+  throwIfRequiredIsFalsy(dbContextName, 'dbContextName')
+  throwIfRequiredIsFalsy(relativeDbMigratorDirectoryPath, 'relativeDbMigratorDirectoryPath')
+  throwIfRequiredIsFalsy(migrationName, 'migrationName')
+  let args = ['ef', 'migrations', 'add', migrationName, '--context', dbContextName, '-o', `Migrations/${dbContextName}Migrations`]
+  let spawnOptions = {...defaultSpawnOptions, cwd: relativeDbMigratorDirectoryPath}
+  return waitForProcess(spawn('dotnet', args, spawnOptions))
+}
+
+async function dotnetDbRemoveMigration(dbContextName, relativeDbMigratorDirectoryPath) {
+  throwIfRequiredIsFalsy(dbContextName, 'dbContextName')
+  throwIfRequiredIsFalsy(relativeDbMigratorDirectoryPath, 'relativeDbMigratorDirectoryPath')
+  let spawnOptions = {...defaultSpawnOptions, cwd: relativeDbMigratorDirectoryPath}
+  return waitForProcess(spawn('dotnet', ['ef', 'migrations', 'remove', '--context', dbContextName], spawnOptions))
+}
+
+function throwIfRequiredIsFalsy(requiredArg, argName) {
+  if (!requiredArg) {
+    throw Error(`${argName} is required`)
+  }
+}
+
+function throwIfRequiredArrayIsFalsyOrEmpty(requiredArrayArg, argName) {
+  if (!requiredArrayArg || requiredArrayArg.length === 0 || !Array.isArray(requiredArrayArg)) {
+    throw Error(`${argName} array is required`)
+  }
+}
+
 exports.defaultSpawnOptions = defaultSpawnOptions
+exports.defaultSpawnOptionsWithInput = defaultSpawnOptionsWithInput
 exports.waitForProcess = waitForProcess
 exports.copyNewEnvValues = copyNewEnvValues
 exports.overwriteEnvFile = overwriteEnvFile
@@ -314,3 +390,9 @@ exports.dockerDepsStop = dockerDepsStop
 exports.dotnetBuild = dotnetBuild
 exports.dotnetPack = dotnetPack
 exports.dotnetNugetPublish = dotnetNugetPublish
+exports.dotnetDllCommand = dotnetDllCommand
+exports.dotnetPublish = dotnetPublish
+exports.dotnetDbMigrationsList = dotnetDbMigrationsList
+exports.dotnetDbMigrate = dotnetDbMigrate
+exports.dotnetDbAddMigration = dotnetDbAddMigration
+exports.dotnetDbRemoveMigration = dotnetDbRemoveMigration
