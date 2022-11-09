@@ -346,13 +346,111 @@ async function dotnetDbMigrate(dbContextName, relativeDbMigratorDirectoryPath, m
   return waitForProcess(spawn('dotnet', args, spawnOptions))
 }
 
-async function dotnetDbAddMigration(dbContextName, relativeDbMigratorDirectoryPath, migrationName) {
+async function dotnetDbAddMigration(dbContextName, relativeDbMigratorDirectoryPath, migrationName, withBoilerplate = false) {
   throwIfRequiredIsFalsy(dbContextName, 'dbContextName')
   throwIfRequiredIsFalsy(relativeDbMigratorDirectoryPath, 'relativeDbMigratorDirectoryPath')
   throwIfRequiredIsFalsy(migrationName, 'migrationName')
-  let args = ['ef', 'migrations', 'add', migrationName, '--context', dbContextName, '-o', `Migrations/${dbContextName}Migrations`]
+
+  const migrationsOutputDir = `Migrations/${dbContextName}Migrations`
+
+  let args = ['ef', 'migrations', 'add', migrationName, '--context', dbContextName, '-o', migrationsOutputDir]
   let spawnOptions = {...defaultSpawnOptions, cwd: relativeDbMigratorDirectoryPath}
-  return waitForProcess(spawn('dotnet', args, spawnOptions))
+  await waitForProcess(spawn('dotnet', args, spawnOptions))
+
+  if (withBoilerplate) {
+    await dotnetDbAddMigrationBoilerplate(dbContextName, relativeDbMigratorDirectoryPath, migrationName)
+  }
+}
+
+async function dotnetDbAddMigrationBoilerplate(dbContextName, relativeDbMigratorDirectoryPath, migrationName) {
+  console.log(`Attempting to write boilerplate to generated migration C# file`)
+
+  const migrationsOutputDir = `Migrations/${dbContextName}Migrations`
+  const dirPath = path.join(relativeDbMigratorDirectoryPath, migrationsOutputDir)
+
+  console.log(`Checking for generated C# file in directory: ${dirPath}`)
+
+  const filenames = fs.readdirSync(dirPath).filter(fn => fn.endsWith(`${migrationName}.cs`));
+  if (!filenames || filenames.length === 0) {
+    console.log(`Unable to add boilerplate - could not find auto generated file in directory: ${dirPath}`)
+  }
+  const filename = filenames[0]
+  const filePath = path.join(dirPath, filename)
+
+  if (!fs.existsSync(filePath)) {
+    console.log(`Could not find the file to add boilerplate to at: ${filePath}`)
+    return
+  }
+
+  console.log(`Auto generated C# file to modify: ${filePath}`)
+
+  const usingLine = 'using MikeyT.DbMigrations;'
+  const upLine = `MigrationScriptRunner.RunScript(migrationBuilder, "${migrationName}.sql");`
+  const downLine = `MigrationScriptRunner.RunScript(migrationBuilder, "${migrationName}_Down.sql");`
+
+  const fileContents = await fsp.readFile(filePath, {encoding: 'utf8'})
+  let lines = fileContents.replaceAll('\r', '').split('\n')
+
+  let newLines = []
+
+  newLines.push(lines[0].trim())
+  newLines.push(usingLine)
+
+  let addUpLine = false
+  let addDownLine = false
+  let skipNextLineIfBlank = false
+  for (let i = 1; i < lines.length; i++) {
+    if (skipNextLineIfBlank && lines[i].trim().length === 0) {
+      skipNextLineIfBlank = false
+      continue
+    }
+    if (addUpLine) {
+      let newLine = lines[i].replace('{', `{\n\t\t\t${upLine}`)
+      newLines.push(newLine)
+      addUpLine = false
+      skipNextLineIfBlank = true
+      continue
+    }
+    if (addDownLine) {
+      let newLine = lines[i].replace('{', `{\n\t\t\t${downLine}`)
+      newLines.push(newLine)
+      addDownLine = false
+      skipNextLineIfBlank = true
+      continue
+    }
+    newLines.push(lines[i])
+    if (lines[i].includes('void Up')) {
+      addUpLine = true
+    }
+    if (lines[i].includes('void Down')) {
+      addDownLine = true
+    }
+  }
+
+  const newFileContents = newLines.join('\n')
+
+  await fsp.writeFile(filePath, newFileContents, {encoding: 'utf8'})
+
+  console.log(`Updated file with boilerplate - please ensure it is correct: ${filePath}`)
+
+  const upScriptPath = path.join(relativeDbMigratorDirectoryPath, `Scripts/${migrationName}.sql`)
+  const downScriptPath = path.join(relativeDbMigratorDirectoryPath, `Scripts/${migrationName}_Down.sql`)
+
+  console.log('Creating corresponding empty sql files (no action will be taken if they already exist):')
+  console.log(`  - ${upScriptPath}`)
+  console.log(`  - ${downScriptPath}`)
+
+  if (!fs.existsSync(upScriptPath)) {
+    await fsp.writeFile(upScriptPath, '', {encoding: 'utf8'})
+  } else {
+    console.log('Skipping Up sql script (already exists)')
+  }
+
+  if (!fs.existsSync(downScriptPath)) {
+    await fsp.writeFile(downScriptPath, '', {encoding: 'utf8'})
+  } else {
+    console.log('Skipping Down sql script (already exists)')
+  }
 }
 
 async function dotnetDbRemoveMigration(dbContextName, relativeDbMigratorDirectoryPath) {
