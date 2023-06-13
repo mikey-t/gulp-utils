@@ -193,7 +193,7 @@ async function createTarball(directoryToTarball, outputDirectory, tarballName, c
     options.cwd = cwd
   }
 
-  await tar.c(options, [directoryToTarball])
+  tar.c(options, [directoryToTarball])
 }
 
 async function dockerCompose(command, projectName, dockerRelativeDirectory = 'docker', detached = false) {
