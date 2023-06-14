@@ -1,7 +1,8 @@
 const fs = require('fs')
 const fsp = require('fs').promises
+const fse = require('fs-extra')
 const which = require('which')
-const {spawn, spawnSync} = require('child_process')
+const { spawn, spawnSync } = require('child_process')
 const path = require('path')
 const tar = require('tar')
 
@@ -9,7 +10,7 @@ const defaultSpawnOptions = {
   shell: true,
   stdio: ['ignore', 'inherit', 'inherit']
 }
-const defaultSpawnOptionsWithInput = {...defaultSpawnOptions, stdio: 'inherit'}
+const defaultSpawnOptionsWithInput = { ...defaultSpawnOptions, stdio: 'inherit' }
 
 function waitForProcess(childProcess) {
   return new Promise((resolve, reject) => {
@@ -39,7 +40,7 @@ async function throwIfDockerNotRunning() {
     throw Error('docker command not found')
   }
 
-  let childProcess = spawnSync('docker', ['info'], {encoding: 'utf8'})
+  let childProcess = spawnSync('docker', ['info'], { encoding: 'utf8' })
   if (childProcess.error) {
     throw childProcess.error
   }
@@ -51,7 +52,7 @@ async function throwIfDockerNotRunning() {
 async function bashIntoRunningDockerContainer(containerNamePartial, entryPoint = 'bash') {
   await throwIfDockerNotRunning()
 
-  let childProcess = spawnSync('docker', ['container', 'ls'], {encoding: 'utf8'})
+  let childProcess = spawnSync('docker', ['container', 'ls'], { encoding: 'utf8' })
   if (childProcess.error) {
     throw childProcess.error
   }
@@ -79,7 +80,7 @@ async function bashIntoRunningDockerContainer(containerNamePartial, entryPoint =
 async function dockerContainerIsRunning(containerNamePartial) {
   await throwIfDockerNotRunning()
 
-  let childProcess = spawnSync('docker', ['container', 'ls'], {encoding: 'utf8'})
+  let childProcess = spawnSync('docker', ['container', 'ls'], { encoding: 'utf8' })
   if (childProcess.error) {
     throw childProcess.error
   }
@@ -188,7 +189,7 @@ async function createTarball(directoryToTarball, outputDirectory, tarballName, c
     }
   }
 
-  let options = {gzip: true, file: tarballPath}
+  let options = { gzip: true, file: tarballPath }
   if (!!cwd) {
     options.cwd = cwd
   }
@@ -210,7 +211,7 @@ async function dockerCompose(command, projectName, dockerRelativeDirectory = 'do
 
   await throwIfDockerNotRunning()
 
-  const dockerSpawnOptions = {...defaultSpawnOptions, cwd: dockerWorkingDir, stdio: 'inherit'}
+  const dockerSpawnOptions = { ...defaultSpawnOptions, cwd: dockerWorkingDir, stdio: 'inherit' }
 
   let args = ['--project-name', projectName, command]
   if (detached) {
@@ -255,7 +256,7 @@ async function dotnetPack(projectDirectoryPath, release = true) {
     args.push('-c', 'Release')
   }
 
-  const spawnOptions = {...defaultSpawnOptions, cwd: projectDirectoryPath}
+  const spawnOptions = { ...defaultSpawnOptions, cwd: projectDirectoryPath }
   logCommand('dotnet', args, spawnOptions)
   await waitForProcess(spawn('dotnet', args, spawnOptions))
 }
@@ -270,7 +271,7 @@ async function dotnetNugetPublish(projectDirectoryPath, csprojFilename, release 
 
   const packageName = await getPackageName(projectDirectoryPath, csprojFilename)
   console.log('publishing package ' + packageName)
-  const spawnOptions = {...defaultSpawnOptions, cwd: packageDir}
+  const spawnOptions = { ...defaultSpawnOptions, cwd: packageDir }
   await waitForProcess(spawn('dotnet', [
     'nuget',
     'push',
@@ -304,21 +305,21 @@ async function dotnetDllCommand(relativeDllPath, argsArray, cwd = null, useStdin
 
   let args = [relativeDllPath, ...argsArray]
 
-  let spawnOptions = {...defaultSpawnOptions}
+  let spawnOptions = { ...defaultSpawnOptions }
   if (cwd !== null) {
-    spawnOptions = {...spawnOptions, cwd: cwd}
+    spawnOptions = { ...spawnOptions, cwd: cwd }
   }
   if (useStdin) {
-    spawnOptions = {...spawnOptions, stdio: 'inherit'}
+    spawnOptions = { ...spawnOptions, stdio: 'inherit' }
   }
 
   return waitForProcess(spawn('dotnet', args, spawnOptions))
 }
 
 async function dotnetPublish(cwd = null, outputDir = 'publish') {
-  let spawnOptions = {...defaultSpawnOptions}
+  let spawnOptions = { ...defaultSpawnOptions }
   if (!!cwd) {
-    spawnOptions = {...spawnOptions, cwd: cwd}
+    spawnOptions = { ...spawnOptions, cwd: cwd }
   }
   if (!outputDir) {
     outputDir = 'publish'
@@ -330,7 +331,7 @@ async function dotnetPublish(cwd = null, outputDir = 'publish') {
 async function dotnetDbMigrationsList(dbContextName, relativeDbMigratorDirectoryPath) {
   throwIfRequiredIsFalsy(dbContextName, 'dbContextName')
   throwIfRequiredIsFalsy(relativeDbMigratorDirectoryPath, 'relativeDbMigratorDirectoryPath')
-  let spawnOptions = {...defaultSpawnOptions, cwd: relativeDbMigratorDirectoryPath}
+  let spawnOptions = { ...defaultSpawnOptions, cwd: relativeDbMigratorDirectoryPath }
   return waitForProcess(spawn('dotnet', ['ef', 'migrations', 'list', '--context', dbContextName], spawnOptions))
 }
 
@@ -342,7 +343,7 @@ async function dotnetDbMigrate(dbContextName, relativeDbMigratorDirectoryPath, m
     args.push(migrationName)
   }
   args = [...args, '--context', dbContextName]
-  let spawnOptions = {...defaultSpawnOptions, cwd: relativeDbMigratorDirectoryPath}
+  let spawnOptions = { ...defaultSpawnOptions, cwd: relativeDbMigratorDirectoryPath }
   return waitForProcess(spawn('dotnet', args, spawnOptions))
 }
 
@@ -354,7 +355,7 @@ async function dotnetDbAddMigration(dbContextName, relativeDbMigratorDirectoryPa
   const migrationsOutputDir = `Migrations/${dbContextName}Migrations`
 
   let args = ['ef', 'migrations', 'add', migrationName, '--context', dbContextName, '-o', migrationsOutputDir]
-  let spawnOptions = {...defaultSpawnOptions, cwd: relativeDbMigratorDirectoryPath}
+  let spawnOptions = { ...defaultSpawnOptions, cwd: relativeDbMigratorDirectoryPath }
   await waitForProcess(spawn('dotnet', args, spawnOptions))
 
   if (withBoilerplate) {
@@ -388,7 +389,7 @@ async function dotnetDbAddMigrationBoilerplate(dbContextName, relativeDbMigrator
   const upLine = `MigrationScriptRunner.RunScript(migrationBuilder, "${migrationName}.sql");`
   const downLine = `MigrationScriptRunner.RunScript(migrationBuilder, "${migrationName}_Down.sql");`
 
-  const fileContents = await fsp.readFile(filePath, {encoding: 'utf8'})
+  const fileContents = await fsp.readFile(filePath, { encoding: 'utf8' })
   let lines = fileContents.replaceAll('\r', '').split('\n')
 
   let newLines = []
@@ -429,7 +430,7 @@ async function dotnetDbAddMigrationBoilerplate(dbContextName, relativeDbMigrator
 
   const newFileContents = newLines.join('\n')
 
-  await fsp.writeFile(filePath, newFileContents, {encoding: 'utf8'})
+  await fsp.writeFile(filePath, newFileContents, { encoding: 'utf8' })
 
   console.log(`Updated file with boilerplate - please ensure it is correct: ${filePath}`)
 
@@ -441,13 +442,13 @@ async function dotnetDbAddMigrationBoilerplate(dbContextName, relativeDbMigrator
   console.log(`  - ${downScriptPath}`)
 
   if (!fs.existsSync(upScriptPath)) {
-    await fsp.writeFile(upScriptPath, '', {encoding: 'utf8'})
+    await fsp.writeFile(upScriptPath, '', { encoding: 'utf8' })
   } else {
     console.log('Skipping Up sql script (already exists)')
   }
 
   if (!fs.existsSync(downScriptPath)) {
-    await fsp.writeFile(downScriptPath, '', {encoding: 'utf8'})
+    await fsp.writeFile(downScriptPath, '', { encoding: 'utf8' })
   } else {
     console.log('Skipping Down sql script (already exists)')
   }
@@ -456,7 +457,7 @@ async function dotnetDbAddMigrationBoilerplate(dbContextName, relativeDbMigrator
 async function dotnetDbRemoveMigration(dbContextName, relativeDbMigratorDirectoryPath) {
   throwIfRequiredIsFalsy(dbContextName, 'dbContextName')
   throwIfRequiredIsFalsy(relativeDbMigratorDirectoryPath, 'relativeDbMigratorDirectoryPath')
-  let spawnOptions = {...defaultSpawnOptions, cwd: relativeDbMigratorDirectoryPath}
+  let spawnOptions = { ...defaultSpawnOptions, cwd: relativeDbMigratorDirectoryPath }
   return waitForProcess(spawn('dotnet', ['ef', 'migrations', 'remove', '--context', dbContextName], spawnOptions))
 }
 
@@ -470,6 +471,120 @@ function throwIfRequiredArrayIsFalsyOrEmpty(requiredArrayArg, argName) {
   if (!requiredArrayArg || requiredArrayArg.length === 0 || !Array.isArray(requiredArrayArg)) {
     throw Error(`${argName} array is required`)
   }
+}
+
+async function generateCertWithOpenSsl(url, outputDirectory = './cert') {
+  if (!url) {
+    throw Error('Param \'url\' is required.')
+  }
+
+  // Check if openssl is installed
+  let macOpenSslPath
+  if (process.platform !== 'darwin') {
+    if (!which.sync('openssl', { nothrow: true })) {
+      throw Error('openssl is required but was not found in the path')
+    }
+  } else {
+    console.log('*****************************************************************')
+    console.log('* Important: mac support requires openssl be installed via brew *')
+    console.log('*****************************************************************')
+
+    macOpenSslPath = `${getBrewOpensslPath()}/bin/openssl`
+    console.log(`openssl path: ${macOpenSslPath}`)
+  }
+
+  console.log('openssl is installed, continuing...')
+
+  fse.mkdirpSync(outputDirectory)
+
+  const keyName = url + '.key'
+  const crtName = url + '.crt'
+  const pfxName = url + '.pfx'
+
+  pfxPath = path.join(outputDirectory, pfxName)
+
+  if (fse.pathExistsSync(pfxPath)) {
+    throw Error(`File ${pfxPath} already exists. Delete this first if you want to generate a new version.`)
+  }
+
+  console.log(`attempting to generate cert ${pfxName}`)
+
+  const genCertSpawnArgs = { ...defaultSpawnOptions, cwd: outputDirectory }
+
+  const genKeyAndCrtArgs = `req -x509 -newkey rsa:4096 -sha256 -days 3650 -nodes -keyout ${keyName} -out ${crtName} -subj "/CN=${url}" -addext "subjectAltName=DNS:${url},IP:127.0.0.1"`.split(' ')
+
+  const cmd = process.platform !== 'darwin' ? 'openssl' : macOpenSslPath
+
+  console.log('cmd: ' + cmd)
+
+  await waitForProcess(spawn(cmd, genKeyAndCrtArgs, genCertSpawnArgs))
+
+  console.log('converting key and crt to pfx...')
+
+  const convertToPfxArgs = `pkcs12 -certpbe AES-256-CBC -export -out ${pfxName} -aes256 -inkey ${keyName} -in ${crtName} -password pass:`.split(' ')
+
+  await waitForProcess(spawn(cmd, convertToPfxArgs, genCertSpawnArgs))
+}
+
+function getBrewOpensslPath() {
+  let childProc = spawnSync('brew', ['--prefix', 'openssl'], { encoding: 'utf-8' })
+  if (childProc.error) {
+    throw Error('error attempting to find openssl installed by brew')
+  }
+
+  const output = childProc.stdout
+
+  if (!output || output.length === 0 || output.toLowerCase().startsWith('error')) {
+    throw Error('unexpected output while attempting to find openssl')
+  }
+
+  return output.replace('\n', '')
+}
+
+async function winInstallCert(urlOrCertFilename, relativeCertDirectoryPath = './cert') {
+  if (!urlOrCertFilename) {
+    throw Error('Param \'urlOrCertFilename\' is required.')
+  }
+
+  console.log('******************************\n* Requires admin permissions *\n******************************')
+
+  let certName = urlOrCertFilename.endsWith('.pfx') ? urlOrCertFilename : urlOrCertFilename + '.pfx'
+
+  const certPath = path.join(process.cwd(), relativeCertDirectoryPath, certName)
+
+  if (!fse.pathExistsSync(certPath)) {
+    throw Error(`File ${certPath} does not exist. Generate this first if you want to install it.`)
+  }
+
+  const psCommand = `$env:PSModulePath = [Environment]::GetEnvironmentVariable('PSModulePath', 'Machine'); Import-PfxCertificate -FilePath '${certPath}' -CertStoreLocation Cert:\\LocalMachine\\Root`
+
+  await waitForProcess(spawn('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', psCommand]))
+}
+
+async function winUninstallCert(urlOrSubject) {
+  if (!urlOrSubject) {
+    throw Error('Param \'urlOrSubject\' is required.')
+  }
+
+  console.log('******************************\n* Requires admin permissions *\n******************************')
+
+  const psCommand = `$env:PSModulePath = [Environment]::GetEnvironmentVariable('PSModulePath', 'Machine'); Get-ChildItem Cert:\\LocalMachine\\Root | Where-Object { $_.Subject -match '${urlOrSubject}' } | Remove-Item`;
+
+  await waitForProcess(spawn('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', psCommand]))
+}
+
+function linuxInstallCert() {
+  const instructions = `
+Automated linux cert install not supported (chrome does not use system certs without significant extra configuration).
+
+Manual Instructions:
+- In Chrome, go to chrome://settings/certificates
+- Select Authorities -> import
+- Select your generated .crt file (in the ./cert/ directory by default - if you haven't generated it, see the generateCertWithOpenSsl method)
+- Check box for "Trust certificate for identifying websites"
+- Click OK
+- Reload site`
+  console.log(instructions)
 }
 
 exports.defaultSpawnOptions = defaultSpawnOptions
@@ -494,3 +609,7 @@ exports.dotnetDbMigrationsList = dotnetDbMigrationsList
 exports.dotnetDbMigrate = dotnetDbMigrate
 exports.dotnetDbAddMigration = dotnetDbAddMigration
 exports.dotnetDbRemoveMigration = dotnetDbRemoveMigration
+exports.generateCertWithOpenSsl = generateCertWithOpenSsl
+exports.winInstallCert = winInstallCert
+exports.winUninstallCert = winUninstallCert
+exports.linuxInstallCert = linuxInstallCert
