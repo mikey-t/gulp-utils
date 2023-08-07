@@ -160,41 +160,53 @@ exports.defaultSpawnOptions = {
 }
 
 async function createTarball(directoryToTarball, outputDirectory, tarballName, cwd = '') {
-  if (!directoryToTarball || directoryToTarball.length === 0) {
-    throw new Error('directoryToTarball is required')
-  }
-  if (!outputDirectory || outputDirectory.length === 0) {
-    throw new Error('outputDirectory is required')
-  }
-  if (!tarballName || tarballName.length === 0) {
-    throw new Error('tarballName is required')
-  }
+  return new Promise((resolve, reject) => {
+    try {
+      if (!directoryToTarball || directoryToTarball.length === 0) {
+        throw new Error('directoryToTarball is required')
+      }
+      if (!outputDirectory || outputDirectory.length === 0) {
+        throw new Error('outputDirectory is required')
+      }
+      if (!tarballName || tarballName.length === 0) {
+        throw new Error('tarballName is required')
+      }
 
-  const tarballPath = path.join(outputDirectory, tarballName)
+      const tarballPath = path.join(outputDirectory, tarballName)
 
-  console.log('directory to create tarball from: ' + directoryToTarball)
-  console.log('output will be: ' + tarballPath)
+      console.log('directory to create tarball from: ' + directoryToTarball)
+      console.log('output will be: ' + tarballPath)
 
-  let normalizedDirectoryToTarball = !!cwd ? path.join(cwd, directoryToTarball) : directoryToTarball
+      let normalizedDirectoryToTarball = !!cwd ? path.join(cwd, directoryToTarball) : directoryToTarball
 
-  if (!fs.existsSync(normalizedDirectoryToTarball)) {
-    throw new Error('error: dirToTarball directory does not exist: ' + normalizedDirectoryToTarball)
-  }
+      if (!fs.existsSync(normalizedDirectoryToTarball)) {
+        throw new Error('error: dirToTarball directory does not exist: ' + normalizedDirectoryToTarball)
+      }
 
-  if (!fs.existsSync(outputDirectory)) {
-    fs.mkdirSync(outputDirectory)
-  } else {
-    if (fs.existsSync(tarballPath)) {
-      fs.unlinkSync(tarballPath)
+      if (!fs.existsSync(outputDirectory)) {
+        fs.mkdirSync(outputDirectory)
+      } else {
+        if (fs.existsSync(tarballPath)) {
+          fs.unlinkSync(tarballPath)
+        }
+      }
+
+      let options = { gzip: true, file: tarballPath }
+      if (!!cwd) {
+        options.cwd = cwd
+      }
+
+      tar.c(options, [directoryToTarball])
+        .then(() => {
+          resolve()
+        })
+        .catch(err => {
+          reject(err)
+        })
+    } catch (err) {
+      reject(err)
     }
-  }
-
-  let options = { gzip: true, file: tarballPath }
-  if (!!cwd) {
-    options.cwd = cwd
-  }
-
-  tar.c(options, [directoryToTarball])
+  })
 }
 
 async function dockerCompose(command, projectName, dockerRelativeDirectory = 'docker', detached = false) {
@@ -371,7 +383,7 @@ async function dotnetDbAddMigrationBoilerplate(dbContextName, relativeDbMigrator
 
   console.log(`Checking for generated C# file in directory: ${dirPath}`)
 
-  const filenames = fs.readdirSync(dirPath).filter(fn => fn.endsWith(`${migrationName}.cs`));
+  const filenames = fs.readdirSync(dirPath).filter(fn => fn.endsWith(`${migrationName}.cs`))
   if (!filenames || filenames.length === 0) {
     console.log(`Unable to add boilerplate - could not find auto generated file in directory: ${dirPath}`)
   }
@@ -568,7 +580,7 @@ async function winUninstallCert(urlOrSubject) {
 
   console.log('******************************\n* Requires admin permissions *\n******************************')
 
-  const psCommand = `$env:PSModulePath = [Environment]::GetEnvironmentVariable('PSModulePath', 'Machine'); Get-ChildItem Cert:\\LocalMachine\\Root | Where-Object { $_.Subject -match '${urlOrSubject}' } | Remove-Item`;
+  const psCommand = `$env:PSModulePath = [Environment]::GetEnvironmentVariable('PSModulePath', 'Machine'); Get-ChildItem Cert:\\LocalMachine\\Root | Where-Object { $_.Subject -match '${urlOrSubject}' } | Remove-Item`
 
   await waitForProcess(spawn('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', psCommand]))
 }
