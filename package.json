@@ -1,22 +1,71 @@
 {
   "name": "@mikeyt23/node-cli-utils",
-  "version": "1.4.1",
+  "version": "2.0.0-alpha.0",
   "description": "Some node cli utility functions",
   "author": "Mike Thompson",
   "license": "MIT",
-  "private": false,
-  "files": [
-    "index.js"
-  ],
   "homepage": "https://github.com/mikey-t/node-cli-utils",
   "repository": {
     "type": "git",
     "url": "https://github.com/mikey-t/node-cli-utils.git"
   },
-  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "watch": "tsc -w --p tsconfig.esm.json"
+  },
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/esm/index.d.ts",
+        "default": "./dist/esm/index.js"
+      },
+      "require": {
+        "types": "./dist/cjs/index.d.ts",
+        "default": "./dist/cjs/index.cjs"
+      }
+    },
+    "./certUtils": {
+      "import": {
+        "default": "./dist/esm/certUtils.js"
+      },
+      "require": {
+        "default": "./dist/cjs/certUtils.cjs"
+      }
+    },
+    "./dbMigrationUtils": {
+      "import": {
+        "default": "./dist/esm/dbMigrationUtils.js"
+      },
+      "require": {
+        "default": "./dist/cjs/dbMigrationUtils.cjs"
+      }
+    }
+  },
+  "main": "./dist/esm/index.js",
+  "types": "dist/esm/index.d.ts",
+  "files": [
+    "package.json",
+    "dist/",
+    "readme.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "volta": {
+    "node": "18.17.1"
+  },
+  "devDependencies": {
+    "@types/node": "^18.17.15",
+    "@types/tar": "^6.1.5",
+    "@typescript-eslint/eslint-plugin": "^6.6.0",
+    "@typescript-eslint/parser": "^6.6.0",
+    "eslint": "^8.49.0",
+    "swig-cli": "^0.0.9",
+    "ts-node": "^10.9.1",
+    "typescript": "^5.2.2"
+  },
   "dependencies": {
-    "fs-extra": "^11.1.1",
-    "tar": "^6.1.15",
-    "which": "^3.0.1"
+    "tar": "^6.2.0"
   }
 }
