@@ -3,11 +3,10 @@
 import { spawn, execSync, spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import { config } from './NodeCliUtilsConfig.js'
-import { trace } from './generalUtils.js'
 
-const DEV_LOGGING = true
+const DEV_LOGGING = false // Set to true while developing this script to see more logging in the console
 let loggingEnabled = true // Will be set below by process.argv[2] === 'true' from spawnAsync in generalUtils.js
-config.traceEnabled = true // Will be set below by process.argv[3] === 'true' from spawnAsync in generalUtils.js
+let traceEnabled = true // Will be set below by process.argv[3] === 'true' from spawnAsync in generalUtils.js
 let pollingMillis: number = config.orphanProtectionPollingIntervalMillis // Will be set by process.argv[4] from spawnAsync in generalUtils.js
 
 function getLogPrefix() {
@@ -19,27 +18,34 @@ function getLogPrefix() {
   return `[${hours}:${minutes}:${seconds}:${milliseconds}] `
 }
 
+// Using this trace method instead of importing from generalUtils.js since config is not shared between processes
+export function trace(message?: unknown, ...optionalParams: unknown[]) {
+  const prefix = `[TRACE]`
+  console.log(prefix, message, ...optionalParams)
+}
+
 function logToFile(message: string) {
-  fs.appendFileSync(config.orphanProtectionLoggingPath, `${getLogPrefix()}${message}` + '\n')
+  fs.appendFileSync(config.orphanProtectionLoggingPath, `${getLogPrefix()}${message}` + ((message && message.length && message[message.length - 1] !== '\n') ? '\n' : ''))
 }
 
 function traceAndLog(message: string, isDevTrace = false) {
+  if (isDevTrace && !DEV_LOGGING) {
+    return
+  }
   if (isDevTrace && DEV_LOGGING) {
     trace(getLogPrefix() + message)
     logToFile(message)
     return
   }
-
-  if (config.traceEnabled) {
+  if (traceEnabled) {
     trace(getLogPrefix() + message)
   }
-
   if (loggingEnabled) {
     logToFile(message)
   }
 }
 
-function isParentAlive(parentId: number) {
+function isParentProcessAlive(parentId: number) {
   try {
     const result = spawnSync('tasklist', { shell: true })
     const resultToLog = {
@@ -47,9 +53,7 @@ function isParentAlive(parentId: number) {
       stderr: result.stderr?.toString(),
       stdoutIncludesParentId: result.stdout?.toString().includes(parentId.toString()) ?? false
     }
-    if (DEV_LOGGING) {
-      traceAndLog('tasklist result: ' + JSON.stringify(resultToLog))
-    }
+    traceAndLog('tasklist result: ' + JSON.stringify(resultToLog), true)
     return resultToLog.stdoutIncludesParentId
   } catch (err) {
     if (err instanceof Error) {
@@ -58,7 +62,7 @@ function isParentAlive(parentId: number) {
     } else {
       console.error(err)
     }
-    traceAndLog("Error attempting to fetch task list using 'tasklist' - returning false for isParentAlive()")
+    traceAndLog(`Error attempting to fetch task list using 'tasklist' - returning false for isParentAlive(): ${err instanceof Error ? err.toString() : err}`)
     return false
   }
 }
@@ -74,7 +78,7 @@ function killTree(pid: number) {
 
 try {
   loggingEnabled = process.argv[2] === 'true'
-  config.traceEnabled = process.argv[3] === 'true'
+  traceEnabled = process.argv[3] === 'true'
   pollingMillis = Number(process.argv[4])
   if (Number.isNaN(pollingMillis) || pollingMillis < 0 || pollingMillis > (3600 * 1000)) {
     pollingMillis = config.orphanProtectionPollingIntervalMillis
@@ -83,16 +87,17 @@ try {
 
   if (loggingEnabled) {
     traceAndLog(`Logging enabled with polling rate set to: ${pollingMillis}ms`)
+    traceAndLog(`Trace enabled: ${traceEnabled}`)
   }
 
   if (DEV_LOGGING) {
     const argvString = JSON.stringify(process.argv)
     console.log(argvString)
     logToFile(argvString)
-    traceAndLog(`process.argv[2] (logging enabled): ${process.argv[2]}`)
-    traceAndLog(`process.argv[3]   (trace enabled): ${process.argv[3]}`)
-    traceAndLog(`process.argv[4]  (polling millis): ${process.argv[4]}`)
-    traceAndLog(`rest of process.argv: ${JSON.stringify(passthroughArgs)}`)
+    traceAndLog(`process.argv[2] (logging enabled): ${process.argv[2]}`, true)
+    traceAndLog(`process.argv[3]   (trace enabled): ${process.argv[3]}`, true)
+    traceAndLog(`process.argv[4]  (polling millis): ${process.argv[4]}`, true)
+    traceAndLog(`rest of process.argv: ${JSON.stringify(passthroughArgs)}`, true)
   }
 
   const parentId = process.ppid
@@ -115,7 +120,7 @@ try {
   }
 
   const interval = setInterval(() => {
-    if (!isParentAlive(parentId)) {
+    if (!isParentProcessAlive(parentId)) {
       traceAndLog('Parent process is not alive. Shutting down.')
       killTree(childId)
       clearInterval(interval)

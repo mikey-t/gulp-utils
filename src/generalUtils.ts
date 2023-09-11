@@ -81,23 +81,45 @@ function getCurrentModuleDir(): string {
   return __dirname
 }
 
+const spawnWorkaroundScriptName = 'runWhileParentAlive.js'
+
+export interface SpawnOptionsExtended extends SpawnOptions {
+  isLongRunning?: boolean
+}
+
 /**
- * This is a wrapper function for NodeJS spawn that provides some additional functionality:
- * - If isLongRunning is true and the method is run on Windows, a workaround is used to prevent orphaned processes
- * - Defaults stdio to inherit so that output is visible in the console, but note that this means stdout and stderr will not be available in the returned SpawnResult
+ * This is a wrapper function for NodeJS. Defaults stdio to inherit so that output is visible in the console,
+ * but note that this means stdout and stderr will not be available in the returned SpawnResult.
+ * 
+ * When spawning long-running processes, use {@link spawnAsyncLongRunning} instead so that unexpected
+ * termination of the parent process will not orphan the child process tree on windows.
  * @param command The command to spawn
  * @param args The arguments to pass to the command
  * @param options The options to pass to the command
- * @param isLongRunning This optional param being true in combination with the platform being windows will cause a workaround to prevent orphaned processes
  * @returns A Promise that resolves to a {@link SpawnResult}
  */
-export async function spawnAsync(command: string, args?: string[], options?: SpawnOptions, isLongRunning?: boolean): Promise<SpawnResult> {
+export async function spawnAsync(command: string, args?: string[], options?: SpawnOptions): Promise<SpawnResult> {
+  return spawnAsyncInternal(command, args, options)
+}
+
+/**
+ * Use this alternate spawn wrapper instead of {@link spawnAsync} when spawning long-running processes to
+ * avoid orphaned child process trees on Windows.
+ * @param command The command to spawn
+ * @param args The arguments to pass to the command
+ * @param cwd The current working directory to run the command from - defaults to process.cwd()
+ * @returns A Promise that resolves to a {@link SpawnResult}
+ */
+export async function spawnAsyncLongRunning(command: string, args?: string[], cwd?: string): Promise<SpawnResult> {
+  return spawnAsyncInternal(command, args, { cwd: cwd, isLongRunning: true })
+}
+
+async function spawnAsyncInternal(command: string, args?: string[], options?: SpawnOptionsExtended): Promise<SpawnResult> {
   return new Promise((resolve, reject) => {
     try {
       const defaultSpawnOptions: SpawnOptions = { stdio: 'inherit' }
-      // const defaultSpawnOptions: SpawnOptions = { stdio: 'pipe' }
-      const argsToUse = args ?? []
-      const logPrefix = `[${command} ${argsToUse.join(' ')}] `
+      const argsForChildProcess = args ?? []
+      const logPrefix = `[${command} ${argsForChildProcess.join(' ')}] `
       const mergedOptions = { ...defaultSpawnOptions, ...options }
       const result: SpawnResult = {
         code: 1,
@@ -109,8 +131,9 @@ export async function spawnAsync(command: string, args?: string[], options?: Spa
       // Windows has a bug where child processes are orphaned when using the shell option. This workaround will spawn
       // a "middle" process using the shell option to check whether parent process is still running at intervals and if not, kill the child process tree.
       const workaroundCommand = 'node'
-      const workaroundScript = path.join(getCurrentModuleDir(), 'runWhileParentAlive.js')
-      if (isLongRunning && isPlatformWindows() && command !== workaroundCommand && argsToUse[0] !== workaroundScript) {
+      const workaroundScriptPath = path.join(getCurrentModuleDir(), spawnWorkaroundScriptName)
+      // First check if this is the request for the workaround process itself
+      if (options?.isLongRunning && isPlatformWindows() && command !== workaroundCommand && (!argsForChildProcess[0] || !argsForChildProcess[0].endsWith(spawnWorkaroundScriptName))) {
         trace(`${logPrefix}Running on Windows with shell option - using middle process hack to prevent orphaned processes`)
 
         const loggingEnabledString = config.orphanProtectionLoggingEnabled.toString()
@@ -125,7 +148,7 @@ export async function spawnAsync(command: string, args?: string[], options?: Spa
         }
 
         const workaroundArgs = [
-          workaroundScript,
+          workaroundScriptPath,
           loggingEnabledString,
           traceEnabledString,
           pollingMillisString,
@@ -144,7 +167,7 @@ export async function spawnAsync(command: string, args?: string[], options?: Spa
         return
       }
 
-      const child = spawn(command, argsToUse, mergedOptions)
+      const child = spawn(command, argsForChildProcess, mergedOptions)
       const childId: number | undefined = child.pid
       if (childId === undefined) {
         throw new Error(`${logPrefix}ChildProcess pid is undefined - spawn failed`)
@@ -168,7 +191,7 @@ export async function spawnAsync(command: string, args?: string[], options?: Spa
         const signalMessage = signal ? ` with signal ${signal}` : ''
         trace(`${logPrefix}ChildProcess exited with code ${code}${signalMessage}`)
         // If long running, ctrl+c will cause null, which we don't necessarily want to consider an error
-        result.code = (code === null && isLongRunning) ? 0 : code ?? 1
+        result.code = (code === null && options?.isLongRunning) ? 0 : code ?? 1
         child.removeAllListeners()
         listener.detach()
         resolve(result)
@@ -480,7 +503,13 @@ export async function spawnDockerCompose(dockerComposePath: string, dockerCompos
 
   const longRunning = dockerComposeCommandsThatSupportDetached.includes(dockerComposeCommand) && options && options.attached
 
-  const spawnResult = await spawnAsync(spawnCommand, spawnArgs, { cwd: useDockerComposeFileDirectoryAsCwd ? dockerComposeDir : process.cwd(), shell: true }, longRunning)
+  const spawnOptions: SpawnOptionsExtended = {
+    cwd: useDockerComposeFileDirectoryAsCwd ? dockerComposeDir : process.cwd(),
+    shell: true,
+    isLongRunning: longRunning
+  }
+
+  const spawnResult = await spawnAsyncInternal(spawnCommand, spawnArgs, spawnOptions)
 
   if (spawnResult.code !== 0) {
     throw new Error(`docker compose command failed with code ${spawnResult.code}`)
