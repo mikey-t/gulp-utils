@@ -7,6 +7,11 @@ import { log } from './generalUtils.js'
 const requiresAdminMessage = `➡️ Important: Requires admin permissions`
 const powershellHackPrefix = `$env:PSModulePath = [Environment]::GetEnvironmentVariable('PSModulePath', 'Machine'); `
 
+/**
+ * Wrapper function for calling openssl to generate a self-signed cert to be used for developing a local website with trusted https.
+ * @param url The url to generate a cert for. This will be used as the common name (CN) in the cert as well as the filename for the generated cert files.
+ * @param outputDirectory The directory to write the generated cert files to. Defaults to './cert'.
+ */
 export async function generateCertWithOpenSsl(url: string, outputDirectory: string = './cert') {
   nodeCliUtils.requireString('url', url)
   throwIfMaybeBadUrlChars(url)
@@ -64,6 +69,13 @@ export async function generateCertWithOpenSsl(url: string, outputDirectory: stri
   }
 }
 
+/**
+ * Uses Powershell to install a cert to the local machine's trusted root store. Must have admin permissions.
+ * 
+ * If the cert is already installed, this method will do nothing.
+ * @param urlOrCertFilename The url or cert filename to install. The url + '.pfx' or the cert filename passed must match a file that exists in the certDirectory.
+ * @param certDirectory The directory to look for the cert file in. Defaults to './cert'.
+ */
 export async function winInstallCert(urlOrCertFilename: string, certDirectory = './cert') {
   nodeCliUtils.requireString('urlOrCertFilename', urlOrCertFilename)
   nodeCliUtils.requireValidPath('certDirectory', certDirectory)
@@ -96,6 +108,10 @@ export async function winInstallCert(urlOrCertFilename: string, certDirectory = 
   }
 }
 
+/**
+ * Uses Powershell to uninstall a cert from the local machine's trusted root store. Must have admin permissions.
+ * @param urlOrSubject The url or subject of the cert to uninstall. If the cert was installed with the winInstallCert method, this will be the url passed to that method.
+ */
 export async function winUninstallCert(urlOrSubject: string) {
   nodeCliUtils.requireString('urlOrSubject', urlOrSubject)
 
@@ -110,6 +126,9 @@ export async function winUninstallCert(urlOrSubject: string) {
   }
 }
 
+/**
+ * Does not actually do anything - just outputs the manual instructions for installing a cert for use by chrome on linux.
+ */
 export function linuxInstallCert() {
   const instructions = `Automated linux cert install not supported (chrome does not use system certs without significant extra configuration).
 Manual Instructions:
@@ -122,6 +141,11 @@ Manual Instructions:
   console.log(instructions)
 }
 
+/**
+ * Uses Powershell to check if a cert is already installed to the local machine's trusted root store.
+ * @param urlOrSubject The url or subject of the cert to check. If the cert was installed with the winInstallCert method, this will be the url passed to that method.
+ * @returns `true` if the cert is already installed, `false` otherwise.
+ */
 export async function winCertAlreadyInstalled(urlOrSubject: string): Promise<boolean> {
   const psCommand = `${powershellHackPrefix}Get-ChildItem Cert:\\LocalMachine\\Root | Where-Object { $_.Subject -match '${urlOrSubject}' }`
 
@@ -156,7 +180,7 @@ function throwIfMaybeBadUrlChars(url: string, varName = 'url') {
 }
 
 function getBrewOpensslPath(): string {
-  const brewResult = nodeCliUtils.getSimpleSpawnResultSync('brew', ['--prefix', 'openssl'])
+  const brewResult = nodeCliUtils.simpleSpawnSync('brew', ['--prefix', 'openssl'])
   if (brewResult.error) {
     throw Error('error attempting to find openssl installed by brew')
   }

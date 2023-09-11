@@ -10,18 +10,33 @@ import { config } from './NodeCliUtilsConfig.js'
 
 const isCommonJS = typeof require === "function" && typeof module === "object" && module.exports
 const isEsm = !isCommonJS
+const dockerComposeCommandsThatSupportDetached = ['exec', 'logs', 'ps', 'restart', 'run', 'start', 'stop', 'up']
+const spawnWorkaroundScriptName = 'runWhileParentAlive.js'
 
-export function log(message?: unknown, ...optionalParams: unknown[]) {
-  console.log(message, ...optionalParams)
+/**
+ * Just a wrapper for console.log() to type less.
+ * @param data The data to log
+ * @param moreData More data to log
+ */
+export function log(data: unknown, ...moreData: unknown[]) {
+  console.log(data, ...moreData)
 }
 
-export function trace(message?: unknown, ...optionalParams: unknown[]) {
+/**
+ * Wrapper for console.log() that is suppressed if NodeCliUtilsConfig.logEnabled is false.
+ * @param data The data to log
+ * @param moreData More data to log
+ */
+export function trace(data?: unknown, ...moreData: unknown[]) {
   if (config.traceEnabled) {
     const prefix = `[TRACE]`
-    console.log(prefix, message, ...optionalParams)
+    console.log(prefix, data, ...moreData)
   }
 }
 
+/**
+ * Type guard for a string keyed dictionary.
+ */
 export type StringKeyedDictionary = { [name: string]: string }
 
 /**
@@ -50,41 +65,73 @@ export interface SpawnResult {
   cwd?: string
 }
 
-// I know it's weird that SimpleSpawnResult has more props then SpawnResult... didn't want to pollute spawnAsync anymore than it already has been.
+/**
+ * Error throw by {@link spawnAsync} when the spawned process exits with a non-zero exit code and options.throwOnNonZero is true.
+ * 
+ * Contains a {@link SpawnResult} with the exit code, stdout, stderr, and error (if any).
+ */
+export class SpawnError extends Error {
+  result: SpawnResult
+
+  constructor(message: string, result: SpawnResult) {
+    super(message)
+    this.result = result
+  }
+}
+
+/**
+ * Spawn result for calls to {@link simpleSpawnSync} and {@link simpleCmdSync}.
+ * 
+ * Contains the same properties as {@link SpawnResult} plus stdoutLines, which is stdout split into lines from stdout that weren't empty.
+ */
 export interface SimpleSpawnResult extends SpawnResult {
   stdoutLines: string[]
 }
 
+/**
+ * Error throw by {@link simpleSpawnSync} and {@link simpleCmdSync} when the spawned process exits with a non-zero exit code and throwOnNonZero param is true (the default).
+ * 
+ * Contains a {@link SimpleSpawnResult} with the exit code, stdout, stderr, and error (if any) in addition to stdoutLines, which is stdout split into lines from stdout that weren't empty.
+ */
+export class SimpleSpawnError extends Error {
+  result: SimpleSpawnResult
+
+  constructor(message: string, result: SimpleSpawnResult) {
+    super(message)
+    this.result = result
+  }
+}
+
+/**
+ * The result type for {@link whichSync}. Contains the location of the command, any additional locations, and an error if one occurred.
+ */
 export interface WhichResult {
   location: string | undefined
   additionalLocations: string[] | undefined
   error: Error | undefined
 }
 
+/**
+ * Type guard for command passed to {@link spawnDockerCompose}.
+ */
 export type DockerComposeCommand = 'build' | 'config' | 'cp' | 'create' | 'down' | 'events' | 'exec' | 'images' | 'kill' | 'logs' | 'ls' | 'pause' | 'port' | 'ps' | 'pull' | 'push' | 'restart' | 'rm' | 'run' | 'start' | 'stop' | 'top' | 'unpause' | 'up' | 'version'
 
-const dockerComposeCommandsThatSupportDetached = ['exec', 'logs', 'ps', 'restart', 'run', 'start', 'stop', 'up']
-
+/**
+ * Sleeps for the specified number of milliseconds.
+ * @param ms The number of milliseconds to sleep
+ * @returns A Promise that resolves after the specified number of milliseconds
+ */
 export async function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => {
     setTimeout(resolve, ms)
   })
 }
 
-function getCurrentModuleDir(): string {
-  // @ts-ignore
-  if (isEsm) {
-    // @ts-ignore
-    const directory = fileURLToPath(new URL('.', import.meta.url))
-    return path.normalize(directory)
-  }
-  return __dirname
-}
-
-const spawnWorkaroundScriptName = 'runWhileParentAlive.js'
-
-export interface SpawnOptionsExtended extends SpawnOptions {
-  isLongRunning?: boolean
+/**
+ * An extension of the built-in SpawnOptions with an extra option to specify whether a non-zero exit code should throw an error.
+ */
+export interface SpawnOptionsWithThrow extends SpawnOptions {
+  throwOnNonZero?: boolean
 }
 
 /**
@@ -98,7 +145,7 @@ export interface SpawnOptionsExtended extends SpawnOptions {
  * @param options The options to pass to the command
  * @returns A Promise that resolves to a {@link SpawnResult}
  */
-export async function spawnAsync(command: string, args?: string[], options?: SpawnOptions): Promise<SpawnResult> {
+export async function spawnAsync(command: string, args?: string[], options?: SpawnOptionsWithThrow): Promise<SpawnResult> {
   return spawnAsyncInternal(command, args, options)
 }
 
@@ -112,125 +159,6 @@ export async function spawnAsync(command: string, args?: string[], options?: Spa
  */
 export async function spawnAsyncLongRunning(command: string, args?: string[], cwd?: string): Promise<SpawnResult> {
   return spawnAsyncInternal(command, args, { cwd: cwd, isLongRunning: true })
-}
-
-async function spawnAsyncInternal(command: string, args?: string[], options?: SpawnOptionsExtended): Promise<SpawnResult> {
-  return new Promise((resolve, reject) => {
-    try {
-      const defaultSpawnOptions: SpawnOptions = { stdio: 'inherit' }
-      const argsForChildProcess = args ?? []
-      const logPrefix = `[${command} ${argsForChildProcess.join(' ')}] `
-      const mergedOptions = { ...defaultSpawnOptions, ...options }
-      const result: SpawnResult = {
-        code: 1,
-        stdout: '',
-        stderr: '',
-        cwd: mergedOptions.cwd?.toString() ?? process.cwd()
-      }
-
-      // Windows has a bug where child processes are orphaned when using the shell option. This workaround will spawn
-      // a "middle" process using the shell option to check whether parent process is still running at intervals and if not, kill the child process tree.
-      const workaroundCommand = 'node'
-      const workaroundScriptPath = path.join(getCurrentModuleDir(), spawnWorkaroundScriptName)
-      // First check if this is the request for the workaround process itself
-      if (options?.isLongRunning && isPlatformWindows() && command !== workaroundCommand && (!argsForChildProcess[0] || !argsForChildProcess[0].endsWith(spawnWorkaroundScriptName))) {
-        trace(`${logPrefix}Running on Windows with shell option - using middle process hack to prevent orphaned processes`)
-
-        const loggingEnabledString = config.orphanProtectionLoggingEnabled.toString()
-        const traceEnabledString = config.traceEnabled.toString()
-        const pollingMillisString = config.orphanProtectionPollingIntervalMillis.toString()
-
-        trace(`${logPrefix}Orphan protection logging enabled: ${loggingEnabledString}`)
-        trace(`${logPrefix}Orphan protection trace enabled: ${traceEnabledString}`)
-        trace(`${logPrefix}Orphan protection polling interval: ${pollingMillisString}ms`)
-        if (config.orphanProtectionLoggingEnabled) {
-          trace(`${logPrefix}Orphan protection logging path: ${config.orphanProtectionLoggingPath}`)
-        }
-
-        const workaroundArgs = [
-          workaroundScriptPath,
-          loggingEnabledString,
-          traceEnabledString,
-          pollingMillisString,
-          command,
-          ...(args ?? [])
-        ]
-
-        spawnAsync(workaroundCommand, workaroundArgs, { ...mergedOptions, stdio: 'inherit', shell: true })
-          .then((workaroundResult) => {
-            result.code = workaroundResult.code
-            resolve(result)
-          }).catch((err) => {
-            reject(err)
-          })
-
-        return
-      }
-
-      const child = spawn(command, argsForChildProcess, mergedOptions)
-      const childId: number | undefined = child.pid
-      if (childId === undefined) {
-        throw new Error(`${logPrefix}ChildProcess pid is undefined - spawn failed`)
-      }
-
-      // This will only happen when stdio is not set to 'inherit'
-      child.stdout?.on('data', (data) => {
-        process.stdout.write(data)
-        result.stdout += data.toString()
-      })
-
-      // This will only happen when stdio is not set to 'inherit'
-      child.stderr?.on('data', (data) => {
-        process.stdout.write(data)
-        result.stderr += data.toString()
-      })
-
-      const listener = new SignalListener(child, logPrefix)
-
-      child.on('exit', (code, signal) => {
-        const signalMessage = signal ? ` with signal ${signal}` : ''
-        trace(`${logPrefix}ChildProcess exited with code ${code}${signalMessage}`)
-        // If long running, ctrl+c will cause null, which we don't necessarily want to consider an error
-        result.code = (code === null && options?.isLongRunning) ? 0 : code ?? 1
-        child.removeAllListeners()
-        listener.detach()
-        resolve(result)
-      })
-
-      child.on('error', (error) => {
-        trace(`${logPrefix}ChildProcess emitted an error event: `, error)
-      })
-    } catch (err) {
-      reject(err)
-    }
-  })
-}
-
-class SignalListener {
-  private signals: NodeJS.Signals[] = ['SIGINT', 'SIGTERM', 'SIGQUIT'];
-  private child: ChildProcess
-  private logPrefix: string
-
-  constructor(child: ChildProcess, logPrefix: string) {
-    this.child = child
-    this.logPrefix = logPrefix
-    this.attach()
-  }
-
-  // Arrow function provides unique handler function for each instance of SignalListener
-  private handler = (signal: NodeJS.Signals) => {
-    trace(`${this.logPrefix}Process received ${signal} - killing ChildProcess with ID ${this.child.pid}`)
-    this.child.kill(signal)
-    this.detach()
-  }
-
-  attach() {
-    this.signals.forEach(signal => process.on(signal, this.handler))
-  }
-
-  detach() {
-    this.signals.forEach(signal => process.removeListener(signal, this.handler))
-  }
 }
 
 /**
@@ -275,7 +203,6 @@ export async function emptyDirectory(directoryToEmpty: string, fileAndDirectoryN
   // Add some guardrails to prevent accidentally emptying the wrong directory
   const absolutePath = path.resolve(directoryToEmpty)
   log(`emptying directory: ${absolutePath}`)
-  log(`current working directory: ${process.cwd()}`)
   if (!absolutePath.startsWith(process.cwd())) {
     throw new Error(`directoryToEmpty must be a child of the current working directory: ${directoryToEmpty}`)
   }
@@ -301,7 +228,7 @@ export async function emptyDirectory(directoryToEmpty: string, fileAndDirectoryN
     const direntPath = path.join(directoryToEmpty, dirEntry.name)
 
     if (dirEntry.isDirectory()) {
-      await fsp.rmdir(direntPath, { recursive: true })
+      await fsp.rm(direntPath, { recursive: true })
     } else {
       await fsp.unlink(direntPath)
     }
@@ -357,9 +284,14 @@ export async function copyDirectoryContents(sourceDirectory: string, destination
   }
 }
 
+/**
+ * Runs dotnet build on the specified project.
+ * @param projectPath Path to project file (like .csproj) or directory of project to build
+ * @throws A {@link SpawnError} if the spawned process exits with a non-zero exit code
+ */
 export async function dotnetBuild(projectPath: string) {
   requireValidPath('projectPath', projectPath)
-  await spawnAsync('dotnet', ['build', projectPath])
+  await spawnAsync('dotnet', ['build', projectPath], { throwOnNonZero: true })
 }
 
 /**
@@ -381,6 +313,13 @@ export async function dotnetPublish(projectPath: string = './', configuration: s
   await spawnAsync('dotnet', args, { cwd: cwd })
 }
 
+/**
+ * Helper method to validate that a non-falsy value is provided for a parameter that should be a string.
+ * 
+ * **Warning:** this does not validate the type of the parameter, just whether something non-empty was provided.
+ * @param paramName The name of the parameter, for logging purposes
+ * @param paramValue The value of the parameter
+ */
 export function requireString(paramName: string, paramValue: string) {
   if (paramValue === undefined || paramValue === null || paramValue === '') {
     throw new Error(`Required param '${paramName}' is missing`)
@@ -390,6 +329,11 @@ export function requireString(paramName: string, paramValue: string) {
   }
 }
 
+/**
+ * Helper method to validate that the path actually exists for the provided value.
+ * @param paramName The name of the parameter, for logging purposes
+ * @param paramValue The value of the parameter
+ */
 export function requireValidPath(paramName: string, paramValue: string) {
   requireString(paramName, paramValue)
 
@@ -503,7 +447,7 @@ export async function spawnDockerCompose(dockerComposePath: string, dockerCompos
 
   const longRunning = dockerComposeCommandsThatSupportDetached.includes(dockerComposeCommand) && options && options.attached
 
-  const spawnOptions: SpawnOptionsExtended = {
+  const spawnOptions: SpawnOptionsInternal = {
     cwd: useDockerComposeFileDirectoryAsCwd ? dockerComposeDir : process.cwd(),
     shell: true,
     isLongRunning: longRunning
@@ -531,16 +475,17 @@ export function stringToNonEmptyLines(str: string): string[] {
  * 
  * Use this for simple quick commands that don't require a lot of control.
  * 
- * For commands that aren't Windows and CMD specific, use {@link getSimpleSpawnResultSync}.
+ * For commands that aren't Windows and CMD specific, use {@link simpleSpawnSync}.
  * @param command Command to run
  * @param args Arguments to pass to the command
  * @returns An object with the status code, stdout, stderr, and error (if any)
+ * @throws {@link SimpleSpawnError} if the command fails and throwOnNonZero is true
  */
-export function getSimpleCmdResultSync(command: string, args?: string[]): SimpleSpawnResult {
+export function simpleCmdSync(command: string, args?: string[], throwOnNonZero: boolean = true): SimpleSpawnResult {
   if (!isPlatformWindows()) {
     throw new Error('getCmdResult is only supported on Windows')
   }
-  return getSimpleSpawnResultSync('cmd', ['/D', '/S', '/C', command, ...(args ?? [])])
+  return simpleSpawnSync('cmd', ['/D', '/S', '/C', command, ...(args ?? [])], throwOnNonZero)
 }
 
 /**
@@ -548,15 +493,17 @@ export function getSimpleCmdResultSync(command: string, args?: string[]): Simple
  * 
  * Use this for simple quick commands that don't require a lot of control.
  * 
- * For commands that are Windows and CMD specific, use {@link getSimpleCmdResultSync}.
+ * For commands that are Windows and CMD specific, use {@link simpleCmdSync}.
  * @param command Command to run
  * @param args Arguments to pass to the command
  * @returns An object with the status code, stdout, stderr, and error (if any)
+ * @throws {@link SimpleSpawnError} if the command fails and throwOnNonZero is true
  */
-export function getSimpleSpawnResultSync(command: string, args?: string[]): SimpleSpawnResult {
+export function simpleSpawnSync(command: string, args?: string[], throwOnNonZero: boolean = true): SimpleSpawnResult {
   requireString('command', command)
   const result = spawnSync(command, args ?? [], { encoding: 'utf-8' })
-  return {
+
+  const spawnResult: SimpleSpawnResult = {
     code: result.status ?? 1,
     stdout: result.stdout.toString(),
     stderr: result.stdout.toString(),
@@ -564,30 +511,53 @@ export function getSimpleSpawnResultSync(command: string, args?: string[]): Simp
     error: result.error,
     cwd: process.cwd()
   }
+
+  if (spawnResult.code !== 0 && throwOnNonZero) {
+    throw new SimpleSpawnError(`spawned process failed with code ${spawnResult.code}`, spawnResult)
+  }
+
+  return spawnResult
 }
 
+/**
+ * @returns `true` if platform() is 'win32', `false` otherwise
+ */
 export function isPlatformWindows() {
   return platform() === 'win32'
 }
 
+/**
+ * 
+ * @returns `true` if platform() is 'darwin', `false` otherwise
+ */
 export function isPlatformMac() {
   return platform() === 'darwin'
 }
 
+/**
+ * 
+ * @returns `true` if {@link isPlatformWindows} and {@link isPlatformMac} are both `false, otherwise returns `false`
+ */
 export function isPlatformLinux() {
   return !isPlatformWindows() && !isPlatformMac()
 }
 
+/**
+ * This is a cross-platform method to get the location of a system command. Useful for checking if software
+ * is installed, where it's installed and whether there are multiple locations for a command.
+ * @param commandName The name of the command to find
+ * @returns The location of the command, any additional locations, and an error if one occurred
+ */
 export function whichSync(commandName: string): WhichResult {
   if (isPlatformWindows()) {
-    const result = getSimpleCmdResultSync('where', [commandName])
+    const result = simpleCmdSync('where', [commandName])
     return {
       location: result.stdoutLines[0],
       additionalLocations: result.stdoutLines.slice(1),
       error: result.error
     }
   } else {
-    const result = getSimpleSpawnResultSync('which', ['-a', commandName])
+    const result = simpleSpawnSync('which', ['-a', commandName])
     return {
       location: result.stdoutLines[0],
       additionalLocations: result.stdoutLines.slice(1),
@@ -596,7 +566,17 @@ export function whichSync(commandName: string): WhichResult {
   }
 }
 
+/**
+ * First checks if docker is installed and if not immediately returns false.
+ * 
+ * Then runs the `docker info` command and looks for "error during connect" in the output to determine if docker is running.
+ * @returns `true` if docker is installed and running, `false` otherwise
+ */
 export async function isDockerRunning(): Promise<boolean> {
+  if (!whichSync('docker').location) {
+    trace('whichSync will not check if docker is running because docker does not appear to be installed - returning false')
+    return false
+  }
   return new Promise((resolve) => {
     exec('docker info', (error, stdout) => {
       if (error) {
@@ -612,6 +592,11 @@ export async function isDockerRunning(): Promise<boolean> {
   })
 }
 
+/**
+ * Uses built-in NodeJS readline to ask a question and return the user's answer.
+ * @param query The question to ask
+ * @returns A Promise that resolves to the user's answer
+ */
 export function askQuestion(query: string): Promise<string> {
   const rl = readline.createInterface({
     input: process.stdin,
@@ -626,6 +611,11 @@ export function askQuestion(query: string): Promise<string> {
   )
 }
 
+/**
+ * A simple CLI prompt using the built-in NodeJS readline functionality to ask for confirmation.
+ * @param question The question to ask
+ * @returns A Promise that resolves to true if the user answers 'y' or 'yes', false otherwise
+ */
 export function getConfirmation(question: string): Promise<boolean> {
   const rl = readline.createInterface({
     input: process.stdin,
@@ -642,6 +632,9 @@ export function getConfirmation(question: string): Promise<boolean> {
   })
 }
 
+/**
+ * Example of using {@link getConfirmation}.
+ */
 export async function getConfirmationExample() {
   if (await getConfirmation('Do you even?')) {
     log('you do even')
@@ -650,6 +643,9 @@ export async function getConfirmationExample() {
   }
 }
 
+/**
+ * Spawns a process that runs the necessary commands to install or update the dotnet-ef tool globally on the system.
+ */
 export async function installOrUpdateDotnetEfTool() {
   const installed = whichSync('dotnet-ef').location
   if (installed) {
@@ -661,6 +657,11 @@ export async function installOrUpdateDotnetEfTool() {
   await spawnAsync('dotnet', args)
 }
 
+/**
+ * Spawns a process that runs the following commands to clean and re-install the dotnet dev certs:
+ * - dotnet dev-certs https --clean
+ * - dotnet dev-certs https -t
+ */
 export async function configureDotnetDevCerts() {
   await spawnAsync('dotnet', ['dev-certs', 'https', '--clean'])
   await spawnAsync('dotnet', ['dev-certs', 'https', '-t'])
@@ -728,6 +729,65 @@ export async function copyModifiedEnv(sourcePath: string, destinationPath: strin
   await fsp.writeFile(destinationPath, newEnvFileContent)
 }
 
+/**
+ * Filters a dictionary by key.
+ * @param dict The dictionary to filter
+ * @param predicate A function that returns true if the key should be included in the filtered dictionary
+ * @returns A new dictionary with only the keys that passed the predicate
+ */
+export function filterDictionary(dict: StringKeyedDictionary, predicate: (key: string) => boolean): StringKeyedDictionary {
+  // Notes to self:
+  // - The second param of reduce is the initial value of the accumulator
+  // - Reduce processes each element of the array and returns the accumulator for the next iteration
+  // - In our case, the accumulator is a new dictionary that we're building up
+  return Object.keys(dict)
+    .filter(predicate)
+    .reduce((accumulator, key) => {
+      accumulator[key] = dict[key]
+      return accumulator
+    }, {} as StringKeyedDictionary)
+}
+
+/**
+ * Sorts a dictionary by key in ascending order.
+ * @param dict The dictionary to sort
+ * @returns A new dictionary sorted by key in ascending order
+ */
+export function sortDictionaryByKeyAsc(dict: StringKeyedDictionary): StringKeyedDictionary {
+  const newSortedDict = Object.entries(dict).sort((a, b) => {
+    if (a < b) {
+      return -1
+    }
+    if (a > b) {
+      return 1
+    }
+    return 0
+  })
+
+  return Object.fromEntries(newSortedDict)
+}
+
+/**
+ * Helper method to delete a .env file if it exists.
+ * @param envPath The path to the .env file to delete
+ */
+export async function deleteEnvIfExists(envPath: string) {
+  // Just protecting ourselves from accidentally deleting something we didn't mean to
+  if (envPath.endsWith('.env') === false) {
+    throw new Error(`envPath must end with '.env': ${envPath}`)
+  }
+  // Using fsp.unlink will throw an error if it's a directory
+  if (fs.existsSync(envPath)) {
+    await fsp.unlink(envPath)
+  }
+}
+
+//            ⬆ End Exports ⬆
+// =======================================
+//       ⬇ Begin Internal Helpers ⬇
+
+
+
 async function copyEnv(sourcePath: string, destinationPath: string, overrideExistingDestinationValues = true, suppressAddKeysMessages = false) {
   requireValidPath('sourcePath', sourcePath)
 
@@ -785,55 +845,148 @@ function dictionaryToEnvFileString(dict: StringKeyedDictionary): string {
   return Object.entries(dict).map(kvp => `${kvp[0]}=${kvp[1]}`).join('\n') + '\n'
 }
 
-/**
- * Filters a dictionary by key.
- * @param dict The dictionary to filter
- * @param predicate A function that returns true if the key should be included in the filtered dictionary
- * @returns A new dictionary with only the keys that passed the predicate
- */
-export function filterDictionary(dict: StringKeyedDictionary, predicate: (key: string) => boolean): StringKeyedDictionary {
-  // Notes to self:
-  // - The second param of reduce is the initial value of the accumulator
-  // - Reduce processes each element of the array and returns the accumulator for the next iteration
-  // - In our case, the accumulator is a new dictionary that we're building up
-  return Object.keys(dict)
-    .filter(predicate)
-    .reduce((accumulator, key) => {
-      accumulator[key] = dict[key]
-      return accumulator
-    }, {} as StringKeyedDictionary)
+interface SpawnOptionsInternal extends SpawnOptionsWithThrow {
+  isLongRunning?: boolean
 }
 
-/**
- * Sorts a dictionary by key in ascending order.
- * @param dict The dictionary to sort
- * @returns A new dictionary sorted by key in ascending order
- */
-export function sortDictionaryByKeyAsc(dict: StringKeyedDictionary): StringKeyedDictionary {
-  const newSortedDict = Object.entries(dict).sort((a, b) => {
-    if (a < b) {
-      return -1
+async function spawnAsyncInternal(command: string, args?: string[], options?: SpawnOptionsInternal): Promise<SpawnResult> {
+  return new Promise((resolve, reject) => {
+    try {
+      const defaultSpawnOptions: SpawnOptions = { stdio: 'inherit' }
+      const argsForChildProcess = args ?? []
+      const logPrefix = `[${command} ${argsForChildProcess.join(' ')}] `
+      const mergedOptions = { ...defaultSpawnOptions, ...options }
+      const result: SpawnResult = {
+        code: 1,
+        stdout: '',
+        stderr: '',
+        cwd: mergedOptions.cwd?.toString() ?? process.cwd()
+      }
+
+      // Windows has a bug where child processes are orphaned when using the shell option. This workaround will spawn
+      // a "middle" process using the shell option to check whether parent process is still running at intervals and if not, kill the child process tree.
+      const workaroundCommand = 'node'
+      const workaroundScriptPath = path.join(getCurrentModuleDir(), spawnWorkaroundScriptName)
+      // First check if this is the request for the workaround process itself
+      if (options?.isLongRunning && isPlatformWindows() && command !== workaroundCommand && (!argsForChildProcess[0] || !argsForChildProcess[0].endsWith(spawnWorkaroundScriptName))) {
+        trace(`${logPrefix}Running on Windows with shell option - using middle process hack to prevent orphaned processes`)
+
+        const loggingEnabledString = config.orphanProtectionLoggingEnabled.toString()
+        const traceEnabledString = config.traceEnabled.toString()
+        const pollingMillisString = config.orphanProtectionPollingIntervalMillis.toString()
+
+        trace(`${logPrefix}Orphan protection logging enabled: ${loggingEnabledString}`)
+        trace(`${logPrefix}Orphan protection trace enabled: ${traceEnabledString}`)
+        trace(`${logPrefix}Orphan protection polling interval: ${pollingMillisString}ms`)
+        if (config.orphanProtectionLoggingEnabled) {
+          trace(`${logPrefix}Orphan protection logging path: ${config.orphanProtectionLoggingPath}`)
+        }
+
+        const workaroundArgs = [
+          workaroundScriptPath,
+          loggingEnabledString,
+          traceEnabledString,
+          pollingMillisString,
+          command,
+          ...(args ?? [])
+        ]
+
+        spawnAsync(workaroundCommand, workaroundArgs, { ...mergedOptions, stdio: 'inherit', shell: true })
+          .then((workaroundResult) => {
+            result.code = workaroundResult.code
+            if (options?.throwOnNonZero && result.code !== 0) {
+              reject(getSpawnError(result.code, result, options))
+              return
+            }
+            resolve(result)
+          }).catch((err) => {
+            reject(err)
+          })
+
+        return
+      }
+
+      const child = spawn(command, argsForChildProcess, mergedOptions)
+      const childId: number | undefined = child.pid
+      if (childId === undefined) {
+        throw new Error(`${logPrefix}ChildProcess pid is undefined - spawn failed`)
+      }
+
+      // This event willy only be emitted when stdio is not set to 'inherit'
+      child.stdout?.on('data', (data) => {
+        process.stdout.write(data)
+        result.stdout += data.toString()
+      })
+
+      // This event willy only be emitted when stdio is not set to 'inherit'
+      child.stderr?.on('data', (data) => {
+        process.stdout.write(data)
+        result.stderr += data.toString()
+      })
+
+      const listener = new SignalListener(child, logPrefix)
+
+      child.on('exit', (code, signal) => {
+        const signalMessage = signal ? ` with signal ${signal}` : ''
+        trace(`${logPrefix}ChildProcess exited with code ${code}${signalMessage}`)
+        // If long running, ctrl+c will cause null, which we don't necessarily want to consider an error
+        result.code = (code === null && options?.isLongRunning) ? 0 : code ?? 1
+        child.removeAllListeners()
+        listener.detach()
+        if (options?.throwOnNonZero && result.code !== 0) {
+          reject(getSpawnError(result.code, result, mergedOptions))
+          return
+        }
+        resolve(result)
+      })
+
+      child.on('error', (error) => {
+        trace(`${logPrefix}ChildProcess emitted an error event: `, error)
+      })
+    } catch (err) {
+      reject(err)
     }
-    if (a > b) {
-      return 1
-    }
-    return 0
   })
-
-  return Object.fromEntries(newSortedDict)
 }
 
-/**
- * Helper method to delete a .env file if it exists.
- * @param envPath The path to the .env file to delete
- */
-export async function deleteEnvIfExists(envPath: string) {
-  // Just protecting ourselves from accidentally deleting something we didn't mean to
-  if (envPath.endsWith('.env') === false) {
-    throw new Error(`envPath must end with '.env': ${envPath}`)
+function getSpawnError(code: number, result: SpawnResult, options: SpawnOptionsInternal): SpawnError {
+  const additional = options.throwOnNonZero && options.stdio === 'inherit' ? `. See above for more details (stdio is 'inherit').` : ''
+  return new SpawnError(`Spawning child process failed with code ${code}${additional}`, result)
+}
+
+class SignalListener {
+  private signals: NodeJS.Signals[] = ['SIGINT', 'SIGTERM', 'SIGQUIT'];
+  private child: ChildProcess
+  private logPrefix: string
+
+  constructor(child: ChildProcess, logPrefix: string) {
+    this.child = child
+    this.logPrefix = logPrefix
+    this.attach()
   }
-  // Using fsp.unlink will throw an error if it's a directory
-  if (fs.existsSync(envPath)) {
-    await fsp.unlink(envPath)
+
+  // Arrow function provides unique handler function for each instance of SignalListener
+  private handler = (signal: NodeJS.Signals) => {
+    trace(`${this.logPrefix}Process received ${signal} - killing ChildProcess with ID ${this.child.pid}`)
+    this.child.kill(signal)
+    this.detach()
   }
+
+  attach() {
+    this.signals.forEach(signal => process.on(signal, this.handler))
+  }
+
+  detach() {
+    this.signals.forEach(signal => process.removeListener(signal, this.handler))
+  }
+}
+
+function getCurrentModuleDir(): string {
+  // @ts-ignore
+  if (isEsm) {
+    // @ts-ignore
+    const directory = fileURLToPath(new URL('.', import.meta.url))
+    return path.normalize(directory)
+  }
+  return __dirname
 }

@@ -19,14 +19,32 @@ export async function dotnetEfCommand(projectPath: string, dbContextName: string
   return result.code
 }
 
+/**
+ * Wrapper function for `dotnet ef migrations list`.
+ * @param projectPath The path to the project that contains the DbContext and Migration files
+ * @param dbContextName The name of the DbContext class
+ */
 export async function efMigrationsList(projectPath: string, dbContextName: string) {
   await dotnetEfCommand(projectPath, dbContextName, ['migrations', 'list'],)
 }
 
+/**
+ * Wrapper function for `dotnet ef database update <migration_name>`.
+ * @param projectPath The path to the project that contains the DbContext and Migration files
+ * @param dbContextName The name of the DbContext class
+ * @param migrationName The name of the migration to update to (optional). If not provided, all migrations will be applied.
+ */
 export async function efMigrationsUpdate(projectPath: string, dbContextName: string, migrationName?: string) {
   await dotnetEfCommand(projectPath, dbContextName, ['database', 'update', ...(migrationName ? [migrationName] : [])])
 }
 
+/**
+ * 
+ * @param projectPath The path to the project that contains the DbContext and Migration files
+ * @param dbContextName The name of the DbContext class
+ * @param migrationName The name of the migration to add
+ * @param withBoilerplate If true, boilerplate will be added to the migration C# file and empty Up and Down SQL files will be created
+ */
 export async function efAddMigration(projectPath: string, dbContextName: string, migrationName: string, withBoilerplate = false) {
   const projectDirectory = projectPath.endsWith('.csproj') ? projectPath.substring(0, projectPath.lastIndexOf('/')) : projectPath
   const migrationsOutputDir = getMigrationsProjectRelativePath(dbContextName)
@@ -41,6 +59,12 @@ export async function efAddMigration(projectPath: string, dbContextName: string,
   }
 }
 
+/**
+ * 
+ * @param projectPath The path to the project that contains the DbContext and Migration files
+ * @param dbContextName The name of the DbContext class
+ * @param skipConfirm If `true`, the user will not be prompted to confirm the removal of the last migration
+ */
 export async function efRemoveLastMigration(projectPath: string, dbContextName: string, skipConfirm = false) {
   const lastMigrationName = await getLastMigrationName(projectPath, dbContextName)
 

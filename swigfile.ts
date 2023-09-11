@@ -1,10 +1,10 @@
-import fsp from 'node:fs/promises'
-import { SpawnResult, emptyDirectory, spawnAsync } from './src/generalUtils.js'
+import { emptyDirectory, log, spawnAsync } from './src/generalUtils.js'
 import { series, parallel } from 'swig-cli'
+import fsp from 'node:fs/promises'
 
 const tscPath = './node_modules/typescript/lib/tsc.js'
 
-export const build = series(cleanDist, parallel(buildEsm, buildCjs, copyRunWhileParentAlive))
+export const build = series(cleanDist, parallel(buildEsm, buildCjs))
 export const buildEsmOnly = series(cleanDist, buildEsm)
 export const buildCjsOnly = series(cleanDist, buildCjs)
 
@@ -13,20 +13,16 @@ async function cleanDist() {
 }
 
 async function buildEsm() {
-  await throwIfSpawnFails('buildEsm', () => spawnAsync('node', [tscPath, '--p', 'tsconfig.esm.json']))
+  log('Building ESM')
+  await spawnAsync('node', [tscPath, '--p', 'tsconfig.esm.json'], { throwOnNonZero: true })
 }
 
 async function buildCjs() {
-  await throwIfSpawnFails('buildCjs', () => spawnAsync('node', [tscPath, '--p', 'tsconfig.cjs.json']))
+  log('Building CJS')
+  await spawnAsync('node', [tscPath, '--p', 'tsconfig.cjs.json'], { throwOnNonZero: true })
+  await copyCjsPackageJson()
 }
 
-async function copyRunWhileParentAlive() {
-  await fsp.copyFile('./src/runWhileParentAlive.mjs', './dist/esm/runWhileParentAlive.mjs')
-}
-
-async function throwIfSpawnFails(name: string, func: () => Promise<SpawnResult>) {
-  const result = await func()
-  if (result.code !== 0) {
-    throw new Error(`${name} failed with code ${result.code}`)
-  }
+async function copyCjsPackageJson() {
+  await fsp.copyFile('./package.cjs.json', './dist/cjs/package.json')
 }
