@@ -21,7 +21,7 @@
       },
       "require": {
         "types": "./dist/cjs/index.d.ts",
-        "default": "./dist/cjs/index.cjs"
+        "default": "./dist/cjs/index.js"
       }
     },
     "./certUtils": {
@@ -29,7 +29,7 @@
         "default": "./dist/esm/certUtils.js"
       },
       "require": {
-        "default": "./dist/cjs/certUtils.cjs"
+        "default": "./dist/cjs/certUtils.js"
       }
     },
     "./dbMigrationUtils": {
@@ -37,7 +37,7 @@
         "default": "./dist/esm/dbMigrationUtils.js"
       },
       "require": {
-        "default": "./dist/cjs/dbMigrationUtils.cjs"
+        "default": "./dist/cjs/dbMigrationUtils.js"
       }
     }
   },

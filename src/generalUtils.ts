@@ -1,5 +1,4 @@
 import { ChildProcess, SpawnOptions, exec, spawn, spawnSync } from 'node:child_process'
-import { fileURLToPath } from 'node:url'
 import fsp from 'node:fs/promises'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -850,6 +849,7 @@ interface SpawnOptionsInternal extends SpawnOptionsWithThrow {
 }
 
 async function spawnAsyncInternal(command: string, args?: string[], options?: SpawnOptionsInternal): Promise<SpawnResult> {
+  const moduleDir = await getCurrentModuleDir()
   return new Promise((resolve, reject) => {
     try {
       const defaultSpawnOptions: SpawnOptions = { stdio: 'inherit' }
@@ -866,7 +866,7 @@ async function spawnAsyncInternal(command: string, args?: string[], options?: Sp
       // Windows has a bug where child processes are orphaned when using the shell option. This workaround will spawn
       // a "middle" process using the shell option to check whether parent process is still running at intervals and if not, kill the child process tree.
       const workaroundCommand = 'node'
-      const workaroundScriptPath = path.join(getCurrentModuleDir(), spawnWorkaroundScriptName)
+      const workaroundScriptPath = path.join(moduleDir, spawnWorkaroundScriptName)
       // First check if this is the request for the workaround process itself
       if (options?.isLongRunning && isPlatformWindows() && command !== workaroundCommand && (!argsForChildProcess[0] || !argsForChildProcess[0].endsWith(spawnWorkaroundScriptName))) {
         trace(`${logPrefix}Running on Windows with shell option - using middle process hack to prevent orphaned processes`)
@@ -981,11 +981,16 @@ class SignalListener {
   }
 }
 
-function getCurrentModuleDir(): string {
-  // @ts-ignore
+const currentModuleDir: string = ''
+
+async function getCurrentModuleDir(): Promise<string> {
+  if (currentModuleDir) {
+    return currentModuleDir
+  }
   if (isEsm) {
-    // @ts-ignore
-    const directory = fileURLToPath(new URL('.', import.meta.url))
+    const module = await import('./esmSpecific.mjs')
+    const metaUrlFilePath = module.getImportMetaUrlFilePath()
+    const directory = path.dirname(metaUrlFilePath)
     return path.normalize(directory)
   }
   return __dirname
