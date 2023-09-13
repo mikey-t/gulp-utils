@@ -11,7 +11,8 @@
   },
   "type": "module",
   "scripts": {
-    "watch": "tsc -w --p tsconfig.esm.json"
+    "watch": "tsc -w --p tsconfig.esm.json",
+    "watch:cjs": "tsc -w --p tsconfig.cjs.json"
   },
   "exports": {
     ".": {
@@ -32,6 +33,14 @@
         "default": "./dist/cjs/certUtils.js"
       }
     },
+    "./dotnetUtils": {
+      "import": {
+        "default": "./dist/esm/dotnetUtils.js"
+      },
+      "require": {
+        "default": "./dist/cjs/dotnetUtils.js"
+      }
+    },
     "./dbMigrationUtils": {
       "import": {
         "default": "./dist/esm/dbMigrationUtils.js"
@@ -50,7 +59,7 @@
     "LICENSE"
   ],
   "engines": {
-    "node": ">=14.0.0"
+    "node": ">=16.0.0"
   },
   "volta": {
     "node": "18.17.1"
@@ -63,6 +72,8 @@
     "eslint": "^8.49.0",
     "swig-cli": "^0.0.9",
     "ts-node": "^10.9.1",
+    "typedoc": "^0.25.1",
+    "typedoc-plugin-missing-exports": "^2.1.0",
     "typescript": "^5.2.2"
   },
   "dependencies": {

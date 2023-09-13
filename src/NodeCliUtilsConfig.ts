@@ -1,4 +1,7 @@
-class NodeCliUtilsConfig {
+/**
+ * Config to control a few misc settings in the node-cli-utils package. This module exports a singleton instance.
+ */
+export class NodeCliUtilsConfig {
   private _traceEnabled: boolean = false;
   private _orphanProtectionPollingIntervalMillis = 15000
   private _orphanProtectionLoggingEnabled = false
@@ -33,4 +36,7 @@ class NodeCliUtilsConfig {
   }
 }
 
+/**
+ * Singleton instance of {@link NodeCliUtilsConfig}.
+ */
 export const config = new NodeCliUtilsConfig()

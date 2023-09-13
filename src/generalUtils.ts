@@ -1,16 +1,14 @@
-import { ChildProcess, SpawnOptions, exec, spawn, spawnSync } from 'node:child_process'
-import fsp from 'node:fs/promises'
+import { SpawnOptions, exec, spawnSync } from 'node:child_process'
 import fs from 'node:fs'
-import path from 'node:path'
-import tar, { CreateOptions, FileOptions } from 'tar'
+import fsp from 'node:fs/promises'
 import { platform } from 'node:os'
+import path from 'node:path'
 import * as readline from 'readline'
+import tar, { CreateOptions, FileOptions } from 'tar'
 import { config } from './NodeCliUtilsConfig.js'
+import { SpawnOptionsInternal, copyEnv, dictionaryToEnvFileString, getEnvAsDictionary, spawnAsyncInternal } from './generalUtilsInternal.js'
 
-const isCommonJS = typeof require === "function" && typeof module === "object" && module.exports
-const isEsm = !isCommonJS
 const dockerComposeCommandsThatSupportDetached = ['exec', 'logs', 'ps', 'restart', 'run', 'start', 'stop', 'up']
-const spawnWorkaroundScriptName = 'runWhileParentAlive.js'
 
 /**
  * Just a wrapper for console.log() to type less.
@@ -284,35 +282,6 @@ export async function copyDirectoryContents(sourceDirectory: string, destination
 }
 
 /**
- * Runs dotnet build on the specified project.
- * @param projectPath Path to project file (like .csproj) or directory of project to build
- * @throws A {@link SpawnError} if the spawned process exits with a non-zero exit code
- */
-export async function dotnetBuild(projectPath: string) {
-  requireValidPath('projectPath', projectPath)
-  await spawnAsync('dotnet', ['build', projectPath], { throwOnNonZero: true })
-}
-
-/**
- * Helper method to spawn a process and run 'dotnet publish'.
- * @param projectPath Path to project file (like .csproj) or directory of project to build
- * @param configuration Build configuration, such as 'Release'
- * @param outputDir The relative or absolute path for the build output
- * @param cwd Optionally run the command from another current working directory
- */
-export async function dotnetPublish(projectPath: string = './', configuration: string = 'Release', outputDir: string = 'publish', cwd?: string) {
-  requireValidPath('projectPath', projectPath)
-  requireString('outputDir', outputDir)
-  requireString('configuration', configuration)
-  if (cwd) {
-    requireValidPath('cwd', cwd)
-  }
-  const args = ['publish', projectPath, '-c', configuration, '-o', outputDir]
-  trace(`running dotnet ${args.join(' ')}${cwd ? ` in cwd ${cwd}` : ''}`)
-  await spawnAsync('dotnet', args, { cwd: cwd })
-}
-
-/**
  * Helper method to validate that a non-falsy value is provided for a parameter that should be a string.
  * 
  * **Warning:** this does not validate the type of the parameter, just whether something non-empty was provided.
@@ -385,10 +354,10 @@ export async function createTarball(directoryToTarball: string, tarballPath: str
 
 /**
  * Options for the spawnDockerCompose wrapper function for `docker compose`.
- * @param args        Additional arguments to pass to the docker-compose command
+ * @param args Additional arguments to pass to the docker-compose command
  * @param projectName Pass the same projectName for each commands for the same project to ensure your containers get unique, descriptive and consistent names.
- *                    Note that there are other better options such as using the environment variable `COMPOSE_PROJECT_NAME`. See https://docs.docker.com/compose/environment-variables/envvars/#compose_project_name.
- * @param attached    Default: false. All commands that support the detached option wil use it unless attached is specified as true (-d support: exec, logs, ps, restart, run, start, stop, up)
+ * Note that there are other better options such as using the environment variable `COMPOSE_PROJECT_NAME`. See https://docs.docker.com/compose/environment-variables/envvars/#compose_project_name.
+ * @param attached Default: false. All commands that support the detached option wil use it unless attached is specified as true (-d support: exec, logs, ps, restart, run, start, stop, up)
  * @param useDockerComposeFileDirectoryAsCwd Default: false. If true, the docker compose command will be run in the directory containing the docker compose file.
  */
 export interface DockerComposeOptions {
@@ -643,30 +612,6 @@ export async function getConfirmationExample() {
 }
 
 /**
- * Spawns a process that runs the necessary commands to install or update the dotnet-ef tool globally on the system.
- */
-export async function installOrUpdateDotnetEfTool() {
-  const installed = whichSync('dotnet-ef').location
-  if (installed) {
-    log('dotnet-ef tool already installed, updating...')
-  } else {
-    log('dotnet-ef tool not installed, installing...')
-  }
-  const args = ['tool', installed ? 'update' : 'install', '--global', 'dotnet-ef']
-  await spawnAsync('dotnet', args)
-}
-
-/**
- * Spawns a process that runs the following commands to clean and re-install the dotnet dev certs:
- * - dotnet dev-certs https --clean
- * - dotnet dev-certs https -t
- */
-export async function configureDotnetDevCerts() {
-  await spawnAsync('dotnet', ['dev-certs', 'https', '--clean'])
-  await spawnAsync('dotnet', ['dev-certs', 'https', '-t'])
-}
-
-/**
  * Copy entries from a source .env file to a destination .env file for which the destination .env file does not already have entries.
  * If the destination .env file does not exist, it will be created and populated with the source .env file's values.
  * 
@@ -779,219 +724,4 @@ export async function deleteEnvIfExists(envPath: string) {
   if (fs.existsSync(envPath)) {
     await fsp.unlink(envPath)
   }
-}
-
-//            ⬆ End Exports ⬆
-// =======================================
-//       ⬇ Begin Internal Helpers ⬇
-
-
-
-async function copyEnv(sourcePath: string, destinationPath: string, overrideExistingDestinationValues = true, suppressAddKeysMessages = false) {
-  requireValidPath('sourcePath', sourcePath)
-
-  // If the destination .env file doesn't exist, just copy it and return
-  if (!fs.existsSync(destinationPath)) {
-    log(`creating ${destinationPath} from ${sourcePath}`)
-    await fsp.copyFile(sourcePath, destinationPath)
-    return
-  }
-
-  const sourceDict = getEnvAsDictionary(sourcePath)
-  const destinationDict = getEnvAsDictionary(destinationPath)
-
-  // Determine what keys are missing from destinationPath .env that are in sourcePath .env or .env.template
-  const templateKeys = Object.keys(sourceDict)
-  const destinationKeysBeforeChanging = Object.keys(destinationDict)
-  const keysMissingInDestination = templateKeys.filter(envKey => !destinationKeysBeforeChanging.includes(envKey))
-
-  if (keysMissingInDestination.length > 0) {
-    if (!suppressAddKeysMessages) {
-      log(`adding missing keys in ${destinationPath}: ${keysMissingInDestination.join(', ')}`)
-    }
-  }
-
-  // For instances where both .env files have the same key, use the value from the source if
-  // overrideExistingDestinationValues param is true, otherwise leave the value from the destination intact.
-  const newDict: StringKeyedDictionary = {}
-  for (const [key, value] of Object.entries(overrideExistingDestinationValues ? sourceDict : destinationDict)) {
-    newDict[key] = value
-  }
-
-  // Add entries that the destination doesn't have yet
-  for (const key of keysMissingInDestination) {
-    newDict[key] = sourceDict[key]
-  }
-
-  const newSortedDict: StringKeyedDictionary = sortDictionaryByKeyAsc(newDict)
-  const newEnvFileContent = dictionaryToEnvFileString(newSortedDict)
-  await fsp.writeFile(destinationPath, newEnvFileContent)
-}
-
-function getEnvAsDictionary(envPath: string): StringKeyedDictionary {
-  const dict: StringKeyedDictionary = {}
-  const lines = stringToNonEmptyLines(fs.readFileSync(envPath).toString())
-  for (const line of lines) {
-    if (line && line.indexOf('=') !== -1) {
-      const parts = line.split('=')
-      dict[parts[0].trim()] = parts[1].trim()
-    }
-  }
-  return dict
-}
-
-function dictionaryToEnvFileString(dict: StringKeyedDictionary): string {
-  return Object.entries(dict).map(kvp => `${kvp[0]}=${kvp[1]}`).join('\n') + '\n'
-}
-
-interface SpawnOptionsInternal extends SpawnOptionsWithThrow {
-  isLongRunning?: boolean
-}
-
-async function spawnAsyncInternal(command: string, args?: string[], options?: SpawnOptionsInternal): Promise<SpawnResult> {
-  const moduleDir = await getCurrentModuleDir()
-  return new Promise((resolve, reject) => {
-    try {
-      const defaultSpawnOptions: SpawnOptions = { stdio: 'inherit' }
-      const argsForChildProcess = args ?? []
-      const logPrefix = `[${command} ${argsForChildProcess.join(' ')}] `
-      const mergedOptions = { ...defaultSpawnOptions, ...options }
-      const result: SpawnResult = {
-        code: 1,
-        stdout: '',
-        stderr: '',
-        cwd: mergedOptions.cwd?.toString() ?? process.cwd()
-      }
-
-      // Windows has a bug where child processes are orphaned when using the shell option. This workaround will spawn
-      // a "middle" process using the shell option to check whether parent process is still running at intervals and if not, kill the child process tree.
-      const workaroundCommand = 'node'
-      const workaroundScriptPath = path.join(moduleDir, spawnWorkaroundScriptName)
-      // First check if this is the request for the workaround process itself
-      if (options?.isLongRunning && isPlatformWindows() && command !== workaroundCommand && (!argsForChildProcess[0] || !argsForChildProcess[0].endsWith(spawnWorkaroundScriptName))) {
-        trace(`${logPrefix}Running on Windows with shell option - using middle process hack to prevent orphaned processes`)
-
-        const loggingEnabledString = config.orphanProtectionLoggingEnabled.toString()
-        const traceEnabledString = config.traceEnabled.toString()
-        const pollingMillisString = config.orphanProtectionPollingIntervalMillis.toString()
-
-        trace(`${logPrefix}Orphan protection logging enabled: ${loggingEnabledString}`)
-        trace(`${logPrefix}Orphan protection trace enabled: ${traceEnabledString}`)
-        trace(`${logPrefix}Orphan protection polling interval: ${pollingMillisString}ms`)
-        if (config.orphanProtectionLoggingEnabled) {
-          trace(`${logPrefix}Orphan protection logging path: ${config.orphanProtectionLoggingPath}`)
-        }
-
-        const workaroundArgs = [
-          workaroundScriptPath,
-          loggingEnabledString,
-          traceEnabledString,
-          pollingMillisString,
-          command,
-          ...(args ?? [])
-        ]
-
-        spawnAsync(workaroundCommand, workaroundArgs, { ...mergedOptions, stdio: 'inherit', shell: true })
-          .then((workaroundResult) => {
-            result.code = workaroundResult.code
-            if (options?.throwOnNonZero && result.code !== 0) {
-              reject(getSpawnError(result.code, result, options))
-              return
-            }
-            resolve(result)
-          }).catch((err) => {
-            reject(err)
-          })
-
-        return
-      }
-
-      const child = spawn(command, argsForChildProcess, mergedOptions)
-      const childId: number | undefined = child.pid
-      if (childId === undefined) {
-        throw new Error(`${logPrefix}ChildProcess pid is undefined - spawn failed`)
-      }
-
-      // This event willy only be emitted when stdio is not set to 'inherit'
-      child.stdout?.on('data', (data) => {
-        process.stdout.write(data)
-        result.stdout += data.toString()
-      })
-
-      // This event willy only be emitted when stdio is not set to 'inherit'
-      child.stderr?.on('data', (data) => {
-        process.stdout.write(data)
-        result.stderr += data.toString()
-      })
-
-      const listener = new SignalListener(child, logPrefix)
-
-      child.on('exit', (code, signal) => {
-        const signalMessage = signal ? ` with signal ${signal}` : ''
-        trace(`${logPrefix}ChildProcess exited with code ${code}${signalMessage}`)
-        // If long running, ctrl+c will cause null, which we don't necessarily want to consider an error
-        result.code = (code === null && options?.isLongRunning) ? 0 : code ?? 1
-        child.removeAllListeners()
-        listener.detach()
-        if (options?.throwOnNonZero && result.code !== 0) {
-          reject(getSpawnError(result.code, result, mergedOptions))
-          return
-        }
-        resolve(result)
-      })
-
-      child.on('error', (error) => {
-        trace(`${logPrefix}ChildProcess emitted an error event: `, error)
-      })
-    } catch (err) {
-      reject(err)
-    }
-  })
-}
-
-function getSpawnError(code: number, result: SpawnResult, options: SpawnOptionsInternal): SpawnError {
-  const additional = options.throwOnNonZero && options.stdio === 'inherit' ? `. See above for more details (stdio is 'inherit').` : ''
-  return new SpawnError(`Spawning child process failed with code ${code}${additional}`, result)
-}
-
-class SignalListener {
-  private signals: NodeJS.Signals[] = ['SIGINT', 'SIGTERM', 'SIGQUIT'];
-  private child: ChildProcess
-  private logPrefix: string
-
-  constructor(child: ChildProcess, logPrefix: string) {
-    this.child = child
-    this.logPrefix = logPrefix
-    this.attach()
-  }
-
-  // Arrow function provides unique handler function for each instance of SignalListener
-  private handler = (signal: NodeJS.Signals) => {
-    trace(`${this.logPrefix}Process received ${signal} - killing ChildProcess with ID ${this.child.pid}`)
-    this.child.kill(signal)
-    this.detach()
-  }
-
-  attach() {
-    this.signals.forEach(signal => process.on(signal, this.handler))
-  }
-
-  detach() {
-    this.signals.forEach(signal => process.removeListener(signal, this.handler))
-  }
-}
-
-const currentModuleDir: string = ''
-
-async function getCurrentModuleDir(): Promise<string> {
-  if (currentModuleDir) {
-    return currentModuleDir
-  }
-  if (isEsm) {
-    const module = await import('./esmSpecific.mjs')
-    const metaUrlFilePath = module.getImportMetaUrlFilePath()
-    const directory = path.dirname(metaUrlFilePath)
-    return path.normalize(directory)
-  }
-  return __dirname
 }

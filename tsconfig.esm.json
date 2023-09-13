@@ -19,6 +19,7 @@
   "exclude": [
     "dist",
     "docs",
+    "playground",
     "node_modules",
     "test"
   ]

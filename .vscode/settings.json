@@ -12,4 +12,8 @@
   "javascript.format.semicolons": "remove",
   "typescript.format.semicolons": "remove",
   "typescript.tsserver.experimental.enableProjectDiagnostics": true,
+  "cSpell.words": [
+    "certpbe",
+    "keyout"
+  ],
 }
