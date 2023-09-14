@@ -311,12 +311,55 @@ export function requireValidPath(paramName: string, paramValue: string) {
 }
 
 /**
- * Creates a tarball from a directory.
+ * Creates a tarball from a directory. Uses OS-specific tar to ensure cross-platform compatibility.
+ * @param directoryToTarball The directory to tarball. The directory name will be used as the root directory in the tarball
+ * @param tarballPath The path to the tarball to create - must end with '.tar.gz'
+ * @param excludes An optional array of file and directory name patterns to exclude from the tarball
+ */
+export async function createTarball(directoryToTarball: string, tarballPath: string, excludes?: string[]) {
+  requireValidPath('directoryToTarball', directoryToTarball)
+  requireString('tarballPath', tarballPath)
+
+  if (tarballPath.endsWith('.tar.gz') === false) {
+    throw new Error(`tarballPath must end with '.tar.gz': ${tarballPath}`)
+  }
+
+  const directoryToTarballParentDir = path.dirname(directoryToTarball)
+  const directoryToTarballName = path.basename(directoryToTarball)
+
+  const outputDirectory = path.dirname(tarballPath)
+  const tarballName = path.basename(tarballPath)
+
+  if (!fs.existsSync(outputDirectory)) {
+    trace(`tarballPath directory does not exist - creating '${outputDirectory}'`)
+    await mkdirp(outputDirectory)
+  } else if (fs.existsSync(tarballPath)) {
+    trace(`removing existing tarball '${tarballName}' before creating new one`)
+    await fsp.unlink(tarballPath)
+  }
+
+  // tar -czf archive.tar.gz -C directoryToTarballParentDir --exclude=*.log --exclude=*.tmp mydir
+  const excludesArgs = excludes ? excludes.map(exclude => `--exclude=${exclude}`) : []
+  const args = ['-czf', tarballPath, '-C', directoryToTarballParentDir, ...excludesArgs, directoryToTarballName]
+
+  const result = await spawnAsync('tar', args)
+
+  if (result.code !== 0) {
+    throw new Error(`tar command failed with code ${result.code}`)
+  }
+
+  trace('tarball created: ' + tarballPath)
+}
+
+/**
+ * Creates a tarball from a directory. Uses the npm version of tar to ensure cross-platform compatibility.
+ * 
+ * TODO: delete me if I can get the new version working.
  * @param directoryToTarball The directory to tarball. The directory name will be used as the root directory in the tarball
  * @param tarballPath The path to the tarball to create. Must end with '.tar.gz'
  * @param omitFiles An optional array of file names to omit from the tarball
  */
-export async function createTarball(directoryToTarball: string, tarballPath: string, omitFiles?: string[]): Promise<void> {
+export async function createTarballNpmVersion(directoryToTarball: string, tarballPath: string, omitFiles?: string[]): Promise<void> {
   requireValidPath('directoryToTarball', directoryToTarball)
   requireString('tarballPath', tarballPath)
 
