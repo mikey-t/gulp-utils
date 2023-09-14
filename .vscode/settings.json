@@ -16,4 +16,6 @@
     "certpbe",
     "keyout"
   ],
+  "typescript.preferences.importModuleSpecifier": "relative",
+  "javascript.preferences.importModuleSpecifier": "relative"
 }
