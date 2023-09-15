@@ -771,24 +771,40 @@ export async function deleteEnvIfExists(envPath: string) {
 
 export interface FindFilesOptions {
   maxDepth?: number
-  excludeDirNames?: string[],
+  excludeDirectoryNames?: string[],
   returnForwardSlashRelativePaths?: boolean
 }
 
 /**
  * Searches a directory recursively for files that match the specified pattern.
- * The pattern is a simple text string with stars for wildcards.
- * @param dir The directory to find file in
- * @param pattern The pattern to match (simple text with stars for wildcards)
+ * The filenamePattern is a simple text string with asterisks (*) for wildcards.
+ * @param dir The directory to find files in
+ * @param filenamePattern The pattern to match files against
  * @param options Specify a max depth to search, defaults to 5
  * @returns A Promise that resolves to an array of file paths that match the pattern
  */
-export async function findFilesRecursively(dir: string, pattern: string, options?: FindFilesOptions): Promise<string[]> {
+export async function findFilesRecursively(dir: string, filenamePattern: string, options?: FindFilesOptions): Promise<string[]> {
+  requireValidPath('dir', dir)
+  requireString('pattern', filenamePattern)
+
+  if (filenamePattern.length > 50) {
+    throw new Error(`filenamePattern param must have fewer than 50 characters`)
+  }
+
+  const numWildcards = filenamePattern.replace(/\*+/g, '*').split('*').length - 1
+  if (numWildcards > 5) {
+    throw new Error(`filenamePattern param must contain 5 or fewer wildcards`)
+  }
+
+  if (filenamePattern.includes('/') || filenamePattern.includes('\\')) {
+    throw new Error('filenamePattern param must not contain slashes')
+  }
+
   const defaultOptions: FindFilesOptions = { maxDepth: 5 }
   const mergedOptions = { ...defaultOptions, ...options }
 
   // Convert the pattern to a regex
-  const regex = new RegExp('^' + pattern.split(/\*+/).map(escapeStringForRegex).join('.*') + '$')
+  const regex = new RegExp('^' + filenamePattern.split(/\*+/).map(escapeStringForRegex).join('.*') + '$')
 
   const matches: string[] = []
 
@@ -803,7 +819,7 @@ export async function findFilesRecursively(dir: string, pattern: string, options
 
       if (entry.isDirectory()) {
         // Check if directory is in the exclude list
-        if (!mergedOptions.excludeDirNames || !mergedOptions.excludeDirNames.includes(entry.name)) {
+        if (!mergedOptions.excludeDirectoryNames || !mergedOptions.excludeDirectoryNames.includes(entry.name)) {
           await searchDirectory(fullPath, depth + 1)
         }
       } else if (entry.isFile() && regex.test(entry.name)) {
