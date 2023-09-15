@@ -13,6 +13,7 @@
   "typescript.format.semicolons": "remove",
   "typescript.tsserver.experimental.enableProjectDiagnostics": true,
   "cSpell.words": [
+    "BAAA",
     "certpbe",
     "keyout"
   ],

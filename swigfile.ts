@@ -1,4 +1,4 @@
-import { emptyDirectory, log, spawnAsync } from './src/generalUtils.js'
+import { emptyDirectory, log, spawnAsync, spawnAsyncLongRunning } from './src/generalUtils.js'
 import { series, parallel } from 'swig-cli'
 import fsp from 'node:fs/promises'
 
@@ -22,6 +22,16 @@ export async function test() {
 export async function testOnly() {
   const args = ['--no-warnings', '--loader', 'tsx', '--test-only', '--test', './test/generalUtils.test.ts']
   await spawnAsync('node', args)
+}
+
+export async function testWatch() {
+  const args = ['--no-warnings', '--loader', 'tsx', '--watch', '--test', './test/generalUtils.test.ts']
+  await spawnAsyncLongRunning('node', args)
+}
+
+export async function testWatchOnly() {
+  const args = ['--no-warnings', '--loader', 'tsx', '--test-only', '--watch', '--test', './test/generalUtils.test.ts']
+  await spawnAsyncLongRunning('node', args)
 }
 
 export async function cleanDist() {

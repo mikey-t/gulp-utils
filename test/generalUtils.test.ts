@@ -135,10 +135,3 @@ describe('findFilesRecursively', () => {
     assert.deepEqual(sortedActualMatches, sortedExpectedMatches)
   })
 })
-
-
-
-
-
-
-
