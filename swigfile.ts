@@ -5,6 +5,11 @@ import fsp from 'node:fs/promises'
 // Using direct paths to local tsc to skip the startup delay of using npm
 const tscPath = './node_modules/typescript/lib/tsc.js'
 const typedocPath = './node_modules/typedoc/dist/lib/cli.js'
+const baseTestArgs = ['--no-warnings', '--loader', 'tsx']
+const testFiles = [
+  './test/findFilesRecursively.test.ts',
+  './test/createTarball.test.ts',
+]
 
 export const build = series(cleanDist, parallel(buildEsm, series(buildCjs, copyCjsPackageJson)))
 export const buildEsmOnly = series(cleanDist, buildEsm)
@@ -15,27 +20,27 @@ export async function genDocs() {
 }
 
 export async function test() {
-  if ((await spawnAsync('node', ['--no-warnings', '--loader', 'tsx', '--test', './test/generalUtils.test.ts'])).code !== 0) {
-    throw new Error('Tests failed')
-  }
-}
-
-export async function testOnly() {
-  const args = ['--no-warnings', '--loader', 'tsx', '--test-only', '--test', './test/generalUtils.test.ts']
-  if ((await spawnAsync('node', args)).code !== 0) {
+  if ((await spawnAsync('node', [...baseTestArgs, '--test', ...testFiles])).code !== 0) {
     throw new Error('Tests failed')
   }
 }
 
 export async function testWatch() {
-  const args = ['--no-warnings', '--loader', 'tsx', '--watch', '--test', './test/generalUtils.test.ts']
+  const args = [...baseTestArgs, '--test', '--watch', ...testFiles]
   if ((await spawnAsyncLongRunning('node', args)).code !== 0) {
     throw new Error('Tests failed')
   }
 }
 
-export async function testWatchOnly() {
-  const args = ['--no-warnings', '--loader', 'tsx', '--test-only', '--watch', '--test', './test/generalUtils.test.ts']
+export async function testOnly() {
+  const args = [...baseTestArgs, '--test-only', ...testFiles]
+  if ((await spawnAsync('node', args)).code !== 0) {
+    throw new Error('Tests failed')
+  }
+}
+
+export async function testOnlyWatch() {
+  const args = [...baseTestArgs, '--test-only', '--watch', ...testFiles]
   if ((await spawnAsyncLongRunning('node', args)).code !== 0) {
     throw new Error('Tests failed')
   }

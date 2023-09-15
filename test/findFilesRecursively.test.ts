@@ -1,36 +1,14 @@
 import assert from 'node:assert'
-import fs from 'node:fs'
-import fsp from 'node:fs/promises'
-import path, { join, resolve } from 'node:path'
-import { beforeEach, describe, it } from 'node:test'
-import { createTarball, findFilesRecursively } from '../src/generalUtils.js'
+import { join, resolve } from 'node:path'
+import { describe, it } from 'node:test'
+import { findFilesRecursively } from '../src/generalUtils.js'
 
-const fixturesDir = './test/fixtures'
-const tmpDir = './test/tmp'
 const searchDir = './test/fixtures/search-dir'
 
-const ensureEmptyTmpDir = async () => {
-  if (fs.existsSync(tmpDir)) {
-    await fsp.rm(tmpDir, { recursive: true, force: true })
-  }
-  await fsp.mkdir(tmpDir)
-}
-
-describe('createTarball', () => {
-  beforeEach(async () => {
-    await ensureEmptyTmpDir()
-  })
-
-  it('happy path', async () => {
-    const tarballPath = path.join(tmpDir, 'test.tar.gz')
-    await createTarball(path.join(fixturesDir, 'dirToTarball'), tarballPath)
-  })
-})
-
-describe('findFilesRecursively', () => {
+describe('findFilesRecursively', { only: true }, () => {
   const BASE_DIR = resolve('./test/fixtures/search-dir')
 
-  it('should match files based on pattern *.test.ts', async () => {
+  it('should match files based on pattern *.test.ts', { only: true }, async () => {
     const matches = await findFilesRecursively(BASE_DIR, '*.test.ts')
     const expectedMatches = [
       join(BASE_DIR, 'first-level.test.ts'),
@@ -48,7 +26,7 @@ describe('findFilesRecursively', () => {
     const sortedExpectedMatches = expectedMatches.sort()
     const sortedActualMatches = matches.sort()
 
-    // Uncomment to troubleshoot
+    // Uncomment to troubleshoot - can also be copied to other similar tests
     // const missingInActual = sortedExpectedMatches.filter(item => !sortedActualMatches.includes(item))
     // const extraInActual = sortedActualMatches.filter(item => !sortedExpectedMatches.includes(item))
     // console.log('Missing in actual:', missingInActual)
