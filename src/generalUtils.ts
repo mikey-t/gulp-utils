@@ -37,7 +37,7 @@ export function trace(data?: unknown, ...moreData: unknown[]) {
 export type StringKeyedDictionary = { [name: string]: string }
 
 /**
- * Options for the spawnAsync wrapper function for NodeJS spawn.
+ * Options for the {@link spawnAsync} wrapper function for NodeJS spawn.
  */
 export interface SpawnResult {
   /**
@@ -129,6 +129,7 @@ export async function sleep(ms: number): Promise<void> {
  */
 export interface SpawnOptionsWithThrow extends SpawnOptions {
   throwOnNonZero?: boolean
+  simpleErrorMsg?: string
 }
 
 /**

@@ -15,23 +15,30 @@ export async function genDocs() {
 }
 
 export async function test() {
-  const args = ['--no-warnings', '--loader', 'tsx', '--test', './test/generalUtils.test.ts']
-  await spawnAsync('node', args)
+  if ((await spawnAsync('node', ['--no-warnings', '--loader', 'tsx', '--test', './test/generalUtils.test.ts'])).code !== 0) {
+    throw new Error('Tests failed')
+  }
 }
 
 export async function testOnly() {
   const args = ['--no-warnings', '--loader', 'tsx', '--test-only', '--test', './test/generalUtils.test.ts']
-  await spawnAsync('node', args)
+  if ((await spawnAsync('node', args)).code !== 0) {
+    throw new Error('Tests failed')
+  }
 }
 
 export async function testWatch() {
   const args = ['--no-warnings', '--loader', 'tsx', '--watch', '--test', './test/generalUtils.test.ts']
-  await spawnAsyncLongRunning('node', args)
+  if ((await spawnAsyncLongRunning('node', args)).code !== 0) {
+    throw new Error('Tests failed')
+  }
 }
 
 export async function testWatchOnly() {
   const args = ['--no-warnings', '--loader', 'tsx', '--test-only', '--watch', '--test', './test/generalUtils.test.ts']
-  await spawnAsyncLongRunning('node', args)
+  if ((await spawnAsyncLongRunning('node', args)).code !== 0) {
+    throw new Error('Tests failed')
+  }
 }
 
 export async function cleanDist() {

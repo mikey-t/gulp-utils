@@ -163,7 +163,7 @@ describe('findFilesRecursively', () => {
   it('does not allow forward slashes in the filePattern param', async () => {
     await assert.rejects(async () => await findFilesRecursively(searchDir, 'dirA/second-level*'), { name: 'Error', message: 'filenamePattern param must not contain slashes', })
   })
-  
+
   it('does not allow back slashes in the filePattern param', async () => {
     await assert.rejects(async () => await findFilesRecursively(searchDir, 'dirA\\second-level*'), { name: 'Error', message: 'filenamePattern param must not contain slashes', })
   })
