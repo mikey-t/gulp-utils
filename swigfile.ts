@@ -5,7 +5,6 @@ import fsp from 'node:fs/promises'
 // Using direct paths to local tsc to skip the startup delay of using npm
 const tscPath = './node_modules/typescript/lib/tsc.js'
 const typedocPath = './node_modules/typedoc/dist/lib/cli.js'
-const jestPath = './node_modules/jest/bin/jest.js'
 
 export const build = series(cleanDist, parallel(buildEsm, series(buildCjs, copyCjsPackageJson)))
 export const buildEsmOnly = series(cleanDist, buildEsm)
@@ -16,11 +15,13 @@ export async function genDocs() {
 }
 
 export async function test() {
-  await spawnAsync('node', [jestPath])
+  const args = ['--no-warnings', '--loader', 'tsx', '--test', './test/generalUtils.test.ts']
+  await spawnAsync('node', args)
 }
 
-export async function testWatch() {
-  await spawnAsync('node', [jestPath, '--watch'], { throwOnNonZero: true })
+export async function testOnly() {
+  const args = ['--no-warnings', '--loader', 'tsx', '--test-only', '--test', './test/generalUtils.test.ts']
+  await spawnAsync('node', args)
 }
 
 export async function cleanDist() {

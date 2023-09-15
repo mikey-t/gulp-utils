@@ -2,7 +2,7 @@ import { SpawnOptions, exec, spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import fsp from 'node:fs/promises'
 import { platform } from 'node:os'
-import path from 'node:path'
+import path, { resolve } from 'node:path'
 import * as readline from 'readline'
 import tar, { CreateOptions, FileOptions } from 'tar'
 import { config } from './NodeCliUtilsConfig.js'
@@ -338,7 +338,6 @@ export async function createTarball(directoryToTarball: string, tarballPath: str
     await fsp.unlink(tarballPath)
   }
 
-  // tar -czf archive.tar.gz -C directoryToTarballParentDir --exclude=*.log --exclude=*.tmp mydir
   const excludesArgs = excludes ? excludes.map(exclude => `--exclude=${exclude}`) : []
   const args = ['-czf', tarballPath, '-C', directoryToTarballParentDir, ...excludesArgs, directoryToTarballName]
 
@@ -767,4 +766,62 @@ export async function deleteEnvIfExists(envPath: string) {
   if (fs.existsSync(envPath)) {
     await fsp.unlink(envPath)
   }
+}
+
+
+export interface FindFilesOptions {
+  maxDepth?: number
+  excludeDirNames?: string[],
+  returnForwardSlashRelativePaths?: boolean
+}
+
+/**
+ * Searches a directory recursively for files that match the specified pattern.
+ * The pattern is a simple text string with stars for wildcards.
+ * @param dir The directory to find file in
+ * @param pattern The pattern to match (simple text with stars for wildcards)
+ * @param options Specify a max depth to search, defaults to 5
+ * @returns A Promise that resolves to an array of file paths that match the pattern
+ */
+export async function findFilesRecursively(dir: string, pattern: string, options?: FindFilesOptions): Promise<string[]> {
+  const defaultOptions: FindFilesOptions = { maxDepth: 5 }
+  const mergedOptions = { ...defaultOptions, ...options }
+
+  // Convert the pattern to a regex
+  const regex = new RegExp('^' + pattern.split(/\*+/).map(escapeStringForRegex).join('.*') + '$')
+
+  const matches: string[] = []
+
+  // Recursive function to search within directories
+  async function searchDirectory(directory: string, depth: number): Promise<void> {
+    if (depth > mergedOptions.maxDepth!) return
+
+    const entries = await fsp.readdir(directory, { withFileTypes: true })
+
+    for (const entry of entries) {
+      const fullPath = resolve(directory, entry.name)
+
+      if (entry.isDirectory()) {
+        // Check if directory is in the exclude list
+        if (!mergedOptions.excludeDirNames || !mergedOptions.excludeDirNames.includes(entry.name)) {
+          await searchDirectory(fullPath, depth + 1)
+        }
+      } else if (entry.isFile() && regex.test(entry.name)) {
+        if (mergedOptions.returnForwardSlashRelativePaths) {
+          matches.push(path.relative(dir, fullPath).replace(/\\/g, '/'))
+        } else {
+          matches.push(fullPath)
+        }
+      }
+    }
+  }
+
+  await searchDirectory(dir, 1)  // Start search from the first depth
+
+  return matches
+}
+
+/** Utility function to escape a string for use within regex */
+export function escapeStringForRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }

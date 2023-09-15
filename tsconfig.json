@@ -13,8 +13,7 @@
     "strict": true,
     "skipLibCheck": true,
     "types": [
-      "node",
-      "jest"
+      "node"
     ],
     "typeRoots": [
       "node_modules/@types"
@@ -23,7 +22,7 @@
     "resolveJsonModule": true
   },
   "include": [
-    "*.ts",
+    "swigfile.ts",
     "src/**/*.ts",
     "test/**/*.ts"
   ],
