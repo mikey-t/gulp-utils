@@ -5,10 +5,10 @@ import { findFilesRecursively } from '../src/generalUtils.js'
 
 const searchDir = './test/fixtures/search-dir'
 
-describe('findFilesRecursively', { only: true }, () => {
+describe('findFilesRecursively', () => {
   const BASE_DIR = resolve('./test/fixtures/search-dir')
 
-  it('should match files based on pattern *.test.ts', { only: true }, async () => {
+  it('should match files based on pattern *.test.ts', async () => {
     const matches = await findFilesRecursively(BASE_DIR, '*.test.ts')
     const expectedMatches = [
       join(BASE_DIR, 'first-level.test.ts'),

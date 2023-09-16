@@ -33,14 +33,14 @@ export async function testWatch() {
 }
 
 export async function testOnly() {
-  const args = [...baseTestArgs, '--test-only', ...testFiles]
+  const args = [...baseTestArgs, '--test-only', '--test', ...testFiles]
   if ((await spawnAsync('node', args)).code !== 0) {
     throw new Error('Tests failed')
   }
 }
 
 export async function testOnlyWatch() {
-  const args = [...baseTestArgs, '--test-only', '--watch', ...testFiles]
+  const args = [...baseTestArgs, '--test-only', '--test', '--watch', ...testFiles]
   if ((await spawnAsyncLongRunning('node', args)).code !== 0) {
     throw new Error('Tests failed')
   }
