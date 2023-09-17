@@ -18,7 +18,7 @@
 <h1>Function createTarball</h1></div>
 <section class="tsd-panel">
 <ul class="tsd-signatures">
-<li class="tsd-signature tsd-anchor-link" id="createTarball"><span class="tsd-kind-call-signature">create<wbr/>Tarball</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">directoryToTarball</span>, <span class="tsd-kind-parameter">tarballPath</span>, <span class="tsd-kind-parameter">excludes</span><span class="tsd-signature-symbol">?</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">void</span><span class="tsd-signature-symbol">&gt;</span><a href="#createTarball" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24"><use href="#icon-anchor"></use></svg></a></li>
+<li class="tsd-signature tsd-anchor-link" id="createTarball"><span class="tsd-kind-call-signature">create<wbr/>Tarball</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">directoryToTarball</span>, <span class="tsd-kind-parameter">tarballPath</span>, <span class="tsd-kind-parameter">options</span><span class="tsd-signature-symbol">?</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">void</span><span class="tsd-signature-symbol">&gt;</span><a href="#createTarball" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24"><use href="#icon-anchor"></use></svg></a></li>
 <li class="tsd-description">
 <div class="tsd-comment tsd-typography"><p>Creates a gzipped tarball from a directory by spawning a process to run OS-installed <code>tar</code> to avoid pulling in npm package dependencies.
 Note that Windows has tar since Windows 10 1803 (see <a href="https://devblogs.microsoft.com/commandline/windows10v1803/">https://devblogs.microsoft.com/commandline/windows10v1803/</a>.</p>
@@ -39,14 +39,14 @@ is required, consider using the npm package <code>node-tar</code> instead.</p>
 </div>
 <div class="tsd-comment tsd-typography"></div></li>
 <li>
-<h5><code class="tsd-tag ts-flagOptional">Optional</code> <span class="tsd-kind-parameter">excludes</span>: <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">[]</span></h5>
-<div class="tsd-comment tsd-typography"><p>An optional array of file and directory name patterns to exclude from the tarball</p>
+<h5><code class="tsd-tag ts-flagOptional">Optional</code> <span class="tsd-kind-parameter">options</span>: <a href="../interfaces/index._internal_.CreateTarballOptions.html" class="tsd-signature-type tsd-kind-interface">CreateTarballOptions</a></h5>
+<div class="tsd-comment tsd-typography"><p>See <a href="../interfaces/index._internal_.CreateTarballOptions.html" class="tsd-kind-interface">CreateTarballOptions</a></p>
 </div>
 <div class="tsd-comment tsd-typography"></div></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">void</span><span class="tsd-signature-symbol">&gt;</span></h4>
 <div class="tsd-comment tsd-typography"></div><aside class="tsd-sources">
 <ul>
-<li>Defined in TarballUtility.ts:23</li></ul></aside></li></ul></section></div>
+<li>Defined in <a href="https://github.com/mikey-t/node-cli-utils/blob/c6d8acb/src/TarballUtility.ts#L41">TarballUtility.ts:41</a></li></ul></aside></li></ul></section></div>
 <div class="col-sidebar">
 <div class="page-menu">
 <div class="tsd-navigation settings">

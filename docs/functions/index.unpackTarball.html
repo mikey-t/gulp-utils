@@ -1,4 +1,4 @@
-<!DOCTYPE html><html class="default" lang="en"><head><meta charSet="utf-8"/><meta http-equiv="x-ua-compatible" content="IE=edge"/><title>copyDirectoryContents | @mikeyt23/node-cli-utils</title><meta name="description" content="Documentation for @mikeyt23/node-cli-utils"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="stylesheet" href="../assets/style.css"/><link rel="stylesheet" href="../assets/highlight.css"/><script defer src="../assets/main.js"></script><script async src="../assets/search.js" id="tsd-search-script"></script><script async src="../assets/navigation.js" id="tsd-nav-script"></script></head><body><script>document.documentElement.dataset.theme = localStorage.getItem("tsd-theme") || "os"</script><header class="tsd-page-toolbar">
+<!DOCTYPE html><html class="default" lang="en"><head><meta charSet="utf-8"/><meta http-equiv="x-ua-compatible" content="IE=edge"/><title>unpackTarball | @mikeyt23/node-cli-utils</title><meta name="description" content="Documentation for @mikeyt23/node-cli-utils"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="stylesheet" href="../assets/style.css"/><link rel="stylesheet" href="../assets/highlight.css"/><script defer src="../assets/main.js"></script><script async src="../assets/search.js" id="tsd-search-script"></script><script async src="../assets/navigation.js" id="tsd-nav-script"></script></head><body><script>document.documentElement.dataset.theme = localStorage.getItem("tsd-theme") || "os"</script><header class="tsd-page-toolbar">
 <div class="tsd-toolbar-contents container">
 <div class="table-cell" id="tsd-search" data-base="..">
 <div class="field"><label for="tsd-search-field" class="tsd-widget tsd-toolbar-icon search no-caption"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><use href="#icon-search"></use></svg></label><input type="text" id="tsd-search-field" aria-label="Search"/></div>
@@ -14,32 +14,37 @@
 <ul class="tsd-breadcrumb">
 <li><a href="../index.html">@mikeyt23/node-cli-utils</a></li>
 <li><a href="../modules/index.html">index</a></li>
-<li><a href="index.copyDirectoryContents.html">copyDirectoryContents</a></li></ul>
-<h1>Function copyDirectoryContents</h1></div>
+<li><a href="index.unpackTarball.html">unpackTarball</a></li></ul>
+<h1>Function unpackTarball</h1></div>
 <section class="tsd-panel">
 <ul class="tsd-signatures">
-<li class="tsd-signature tsd-anchor-link" id="copyDirectoryContents"><span class="tsd-kind-call-signature">copy<wbr/>Directory<wbr/>Contents</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">sourceDirectory</span>, <span class="tsd-kind-parameter">destinationDirectory</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">void</span><span class="tsd-signature-symbol">&gt;</span><a href="#copyDirectoryContents" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24"><use href="#icon-anchor"></use></svg></a></li>
+<li class="tsd-signature tsd-anchor-link" id="unpackTarball"><span class="tsd-kind-call-signature">unpack<wbr/>Tarball</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">tarballPath</span>, <span class="tsd-kind-parameter">unpackDirectory</span>, <span class="tsd-kind-parameter">options</span><span class="tsd-signature-symbol">?</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">void</span><span class="tsd-signature-symbol">&gt;</span><a href="#unpackTarball" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24"><use href="#icon-anchor"></use></svg></a></li>
 <li class="tsd-description">
-<div class="tsd-comment tsd-typography"><p>Copies the contents of a directory to another directory (not including the top-level directory itself).</p>
-<p>If the destination directory does not exist, it will be created.</p>
+<div class="tsd-comment tsd-typography"><p>Unpacks a gzipped tarball by spawning a process to run OS-installed <code>tar</code> to avoid pulling in npm package dependencies.
+This method will throw an error if the unpackDirectory is not empty, unless the <code>throwOnNonEmptyUnpackDir</code> option is set to false.</p>
 </div>
 <div class="tsd-parameters">
 <h4 class="tsd-parameters-title">Parameters</h4>
 <ul class="tsd-parameter-list">
 <li>
-<h5><span class="tsd-kind-parameter">sourceDirectory</span>: <span class="tsd-signature-type">string</span></h5>
-<div class="tsd-comment tsd-typography"><p>Directory to copy from</p>
+<h5><span class="tsd-kind-parameter">tarballPath</span>: <span class="tsd-signature-type">string</span></h5>
+<div class="tsd-comment tsd-typography"><p>The path to the tarball to unpack</p>
 </div>
 <div class="tsd-comment tsd-typography"></div></li>
 <li>
-<h5><span class="tsd-kind-parameter">destinationDirectory</span>: <span class="tsd-signature-type">string</span></h5>
-<div class="tsd-comment tsd-typography"><p>Directory to copy to</p>
+<h5><span class="tsd-kind-parameter">unpackDirectory</span>: <span class="tsd-signature-type">string</span></h5>
+<div class="tsd-comment tsd-typography"><p>The directory to unpack the tarball into</p>
+</div>
+<div class="tsd-comment tsd-typography"></div></li>
+<li>
+<h5><code class="tsd-tag ts-flagOptional">Optional</code> <span class="tsd-kind-parameter">options</span>: <a href="../interfaces/index._internal_.TarballUnpackOptions.html" class="tsd-signature-type tsd-kind-interface">TarballUnpackOptions</a></h5>
+<div class="tsd-comment tsd-typography"><p>The options to use when unpacking the tarball. See <a href="../interfaces/index._internal_.TarballUnpackOptions.html" class="tsd-kind-interface">TarballUnpackOptions</a>.</p>
 </div>
 <div class="tsd-comment tsd-typography"></div></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type ">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">void</span><span class="tsd-signature-symbol">&gt;</span></h4>
 <div class="tsd-comment tsd-typography"></div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/mikey-t/node-cli-utils/blob/c6d8acb/src/generalUtils.ts#L246">generalUtils.ts:246</a></li></ul></aside></li></ul></section></div>
+<li>Defined in <a href="https://github.com/mikey-t/node-cli-utils/blob/c6d8acb/src/TarballUtility.ts#L94">TarballUtility.ts:94</a></li></ul></aside></li></ul></section></div>
 <div class="col-sidebar">
 <div class="page-menu">
 <div class="tsd-navigation settings">
