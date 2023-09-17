@@ -1,0 +1,3 @@
+Different test files should use a subdirectory of test/tmp so they can use
+beforeEach() before each test to clean their own particular tmp subdirectory.
+This is especially important so that test files can be run asynchronously.

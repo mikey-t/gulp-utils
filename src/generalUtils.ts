@@ -4,7 +4,6 @@ import fsp from 'node:fs/promises'
 import { platform } from 'node:os'
 import path, { resolve } from 'node:path'
 import * as readline from 'readline'
-import tar, { CreateOptions, FileOptions } from 'tar'
 import { config } from './NodeCliUtilsConfig.js'
 import { SpawnOptionsInternal, copyEnv, dictionaryToEnvFileString, getEnvAsDictionary, spawnAsyncInternal } from './generalUtilsInternal.js'
 
@@ -309,50 +308,6 @@ export function requireValidPath(paramName: string, paramValue: string) {
   if (!fs.existsSync(paramValue)) {
     throw new Error(`Invalid or nonexistent path provided for param '${paramName}': ${paramValue}`)
   }
-}
-
-/**
- * Creates a tarball from a directory. Uses the npm version of tar to ensure cross-platform compatibility.
- * 
- * TODO: delete me if I can get the new version working.
- * @param directoryToTarball The directory to tarball. The directory name will be used as the root directory in the tarball
- * @param tarballPath The path to the tarball to create. Must end with '.tar.gz'
- * @param omitFiles An optional array of file names to omit from the tarball
- */
-export async function createTarballNpmVersion(directoryToTarball: string, tarballPath: string, omitFiles?: string[]): Promise<void> {
-  requireValidPath('directoryToTarball', directoryToTarball)
-  requireString('tarballPath', tarballPath)
-
-  if (tarballPath.endsWith('.tar.gz') === false) {
-    throw new Error(`tarballPath must end with '.tar.gz': ${tarballPath}`)
-  }
-
-  const directoryToTarballParentDir = path.dirname(directoryToTarball)
-  const directoryToTarballName = path.basename(directoryToTarball)
-
-  const outputDirectory = path.dirname(tarballPath)
-  const tarballName = path.basename(tarballPath)
-
-  if (!fs.existsSync(outputDirectory)) {
-    trace(`tarballPath directory does not exist - creating '${outputDirectory}'`)
-    await mkdirp(outputDirectory)
-  } else if (fs.existsSync(tarballPath)) {
-    trace(`removing existing tarball '${tarballName}' before creating new one`)
-    await fsp.unlink(tarballPath)
-  }
-
-  const filesToOmit = omitFiles ?? []
-
-  const options: CreateOptions & FileOptions = {
-    gzip: true,
-    file: tarballPath,
-    cwd: directoryToTarballParentDir,
-    filter: (filePath: string) => !filesToOmit.includes(path.basename(filePath))
-  }
-  const fileList: ReadonlyArray<string> = [directoryToTarballName]
-  await (tar.create as (options: CreateOptions & FileOptions, fileList: ReadonlyArray<string>) => Promise<void>)(options, fileList)
-
-  trace('tarball created: ' + tarballPath)
 }
 
 /**

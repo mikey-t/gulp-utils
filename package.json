@@ -66,7 +66,6 @@
   },
   "devDependencies": {
     "@types/node": "^18.17.15",
-    "@types/tar": "^6.1.5",
     "@typescript-eslint/eslint-plugin": "^6.6.0",
     "@typescript-eslint/parser": "^6.6.0",
     "eslint": "^8.49.0",
@@ -76,8 +75,5 @@
     "typedoc": "^0.25.1",
     "typedoc-plugin-missing-exports": "^2.1.0",
     "typescript": "^5.2.2"
-  },
-  "dependencies": {
-    "tar": "^6.2.0"
   }
 }

@@ -8,7 +8,7 @@ const typedocPath = './node_modules/typedoc/dist/lib/cli.js'
 const baseTestArgs = ['--no-warnings', '--loader', 'tsx']
 const testFiles = [
   './test/findFilesRecursively.test.ts',
-  './test/createTarball.test.ts',
+  './test/TarballUtility.test.ts',
 ]
 
 export const build = series(cleanDist, parallel(buildEsm, series(buildCjs, copyCjsPackageJson)))
