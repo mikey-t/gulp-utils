@@ -757,3 +757,33 @@ export async function findFilesRecursively(dir: string, filenamePattern: string,
 export function escapeStringForRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
+
+/**
+ * Logs the provided 2-dimensional string array as a formatted table.
+ * 
+ * @param data 2-dimensional string array where the first row is the column headers
+ * @example
+ * 
+ * logTable([
+ *   ['Name', 'Age', 'Country'],
+ *   ['Alice', '28', 'USA'],
+ *   ['Bob', '22', 'Canada']
+ * ])
+ */
+export function logTable(data: string[][]): void {
+  if (data.length === 0 || data[0].length === 0) return
+
+  const numColumns = data[0].length
+  const columnWidths: number[] = []
+  for (let i = 0; i < numColumns; i++) {
+    columnWidths[i] = Math.max(...data.map(row => row[i]?.length || 0))
+  }
+
+  const lineSeparator = columnWidths.map(width => '-'.repeat(width)).join(' + ')
+
+  for (let i = 0; i < data.length; i++) {
+    const paddedRowArray = data[i].map((cell, colIdx) => cell.padEnd(columnWidths[colIdx], ' '))
+    log(paddedRowArray.join(' | '))
+    if (i === 0) log(lineSeparator)
+  }
+}
