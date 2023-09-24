@@ -62,7 +62,7 @@ describe('createTarball', () => {
       return mockWhichResult
     })
     const tarballUtility = new TarballUtility(mockWhichSync)
-    assert.rejects(async () => {
+    await assert.rejects(async () => {
       await tarballUtility.createTarball(dirToTarball, tarballPath)
     }, { name: 'Error', message: 'tar command not found - please install tar on your OS to use this method, or consider using the npm package node-tar instead' })
   })
@@ -129,7 +129,7 @@ describe('unpackTarball', () => {
   })
 
   it('throws if stripComponents is less than 0', async () => {
-    assert.rejects(async () => {
+    await assert.rejects(async () => {
       await defaultTarballUtility.unpackTarball(fixtureTarball, unpackedTestDir, { stripComponents: -1 })
     }, { name: 'Error', message: 'stripComponents must be greater than or equal to 0 if provided' })
   })

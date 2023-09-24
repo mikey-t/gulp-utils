@@ -6,6 +6,7 @@ import path, { resolve } from 'node:path'
 import * as readline from 'readline'
 import { config } from './NodeCliUtilsConfig.js'
 import { SpawnOptionsInternal, copyEnv, dictionaryToEnvFileString, getEnvAsDictionary, spawnAsyncInternal } from './generalUtilsInternal.js'
+import { winInstallCert, winUninstallCert } from './certUtils.js'
 
 const dockerComposeCommandsThatSupportDetached = ['exec', 'logs', 'ps', 'restart', 'run', 'start', 'stop', 'up']
 
@@ -16,6 +17,17 @@ const dockerComposeCommandsThatSupportDetached = ['exec', 'logs', 'ps', 'restart
  */
 export function log(data: unknown, ...moreData: unknown[]) {
   console.log(data, ...moreData)
+}
+
+/**
+ * Log conditionally. Useful for methods that have an option to either suppress output or to show it when it normally isn't.
+ * @param data The data to log
+ * @param moreData More data to log
+ */
+export function logIf(shouldLog: boolean, data: unknown, ...moreData: unknown[]) {
+  if (shouldLog) {
+    console.log(data, ...moreData)
+  }
 }
 
 /**
@@ -133,7 +145,8 @@ export interface SpawnOptionsWithThrow extends SpawnOptions {
 
 /**
  * This is a wrapper function for NodeJS. Defaults stdio to inherit so that output is visible in the console,
- * but note that this means stdout and stderr will not be available in the returned SpawnResult.
+ * but note that this means stdout and stderr will not be available in the returned SpawnResult. To hide the output
+ * from the console but collect the stdout and stderr in the SpawnResult, use stdio: 'pipe'.
  * 
  * When spawning long-running processes, use {@link spawnAsyncLongRunning} instead so that unexpected
  * termination of the parent process will not orphan the child process tree on windows.
@@ -549,10 +562,10 @@ export function getConfirmation(question: string): Promise<boolean> {
   })
 
   return new Promise((resolve) => {
-    rl.question(`\n  ❓ ${question}\n  ➡️ Proceed? (yes/no): `, (answer) => {
+    rl.question(`\n  ${Emoji.RedQuestion} ${question}\n  ${Emoji.RightArrow} Proceed? (yes/no): `, (answer) => {
       rl.close()
       const confirmed = answer.toLowerCase() === 'y' || answer.toLowerCase() === 'yes'
-      log(confirmed ? '  ✅ Proceeding\n' : '  ❌ Aborting\n')
+      log(confirmed ? `  ${Emoji.GreenCheck} Proceeding\n` : `  ${Emoji.RedX} Aborting\n`)
       resolve(confirmed)
     })
   })
@@ -796,8 +809,12 @@ export const powershellHackPrefix = `$env:PSModulePath = [Environment]::GetEnvir
 /**
  * Powershell doesn't load the system PSModulePath when running in a non-interactive shell.
  * This is a workaround to set the PSModulePath environment variable to the system value before running a powershell command.
+ * 
+ * **Warning:** Do NOT use this for generating commands dynamically from user input as it could be used to execute arbitrary code.
+ * This is meant solely for building up known commands that are not made up of unsanitized user input, and only at compile time.
+ * See {@link winInstallCert} and {@link winUninstallCert} for examples of taking user input and inserting it safely into known commands.
  * @param command The powershell command to run
- * @returns An array of arguments to pass to spawnAsync
+ * @returns An array of arguments to pass to {@link spawnAsync} with the "powershell" command as the first argument
  */
 export function getPowershellHackArgs(command: string): string[] {
   return ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', `${powershellHackPrefix}${command}`]
@@ -840,4 +857,53 @@ export function humanizeTime(milliseconds: number) {
   }
 
   return `${stringValue} ${unit}`
+}
+
+export class ExtendedError extends Error {
+  public innerError: Error | null
+
+  constructor(message: string, innerError?: Error) {
+    super(message)
+    this.innerError = innerError || null
+    Object.setPrototypeOf(this, ExtendedError.prototype)
+  }
+}
+
+export enum AnsiColor {
+  RESET = '\x1b[0m',
+  RED = '\x1b[31m',
+  GREEN = '\x1b[32m',
+  YELLOW = '\x1b[33m',
+  CYAN = '\x1b[96m',
+  GRAY = '\x1b[90m',
+  PURPLE = '\x1b[35m'
+}
+
+export const color = (str: string, colorAnsiCode: AnsiColor): string => {
+  return `${colorAnsiCode}${str}${AnsiColor.RESET}`
+}
+
+export const red = (str: string) => color(str, AnsiColor.RED)
+export const green = (str: string) => color(str, AnsiColor.GREEN)
+export const cyan = (str: string) => color(str, AnsiColor.CYAN)
+export const gray = (str: string) => color(str, AnsiColor.GRAY)
+export const purple = (str: string) => color(str, AnsiColor.PURPLE)
+export const yellow = (str: string) => color(str, AnsiColor.YELLOW)
+
+export enum Emoji {
+  RightArrow = '➡️',
+  LeftArrow = '⬅️',
+  GreenCheck = '✅',
+  Warning = '⚠️',
+  Lightning = '⚡',
+  Exclamation = '❗',
+  RedQuestion = '❓',
+  RedX = '❌',
+  Info = 'ℹ️',
+  SadFace = '😢',
+  Tools = '🛠️',
+  NoEntry = '⛔',
+  Stop = '🛑',
+  Certificate = '📜',
+  Key = '🔑',
 }

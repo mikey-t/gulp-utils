@@ -28,4 +28,3 @@ describe('humanizeTime', () => {
     assert.ok(['1.01 hours', '1.02 hours'].includes(humanizeTime(3660000)))
   })
 })
-

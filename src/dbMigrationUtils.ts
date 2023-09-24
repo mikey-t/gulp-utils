@@ -1,4 +1,4 @@
-import { getConfirmation, log, requireString, requireValidPath, spawnAsync } from './generalUtils.js'
+import { Emoji, getConfirmation, log, requireString, requireValidPath, spawnAsync } from './generalUtils.js'
 import path from 'node:path'
 import fs from 'node:fs'
 import fsp from 'node:fs/promises'
@@ -88,7 +88,7 @@ async function deleteScriptFileIfEmpty(scriptPath: string) {
     if (scriptContents.trim().length === 0) {
       await fsp.unlink(scriptPath)
     } else {
-      log(`⚠️ Skipping deletion of non-empty script file: ${scriptPath}`)
+      log(`${Emoji.Warning} Skipping deletion of non-empty script file: ${scriptPath}`)
     }
   }
 }

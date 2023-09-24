@@ -137,13 +137,17 @@ export async function spawnAsyncInternal(command: string, args?: string[], optio
 
       // This event will only be emitted when stdio is NOT set to 'inherit'
       child.stdout?.on('data', (data) => {
-        process.stdout.write(data)
+        // Commenting this out for now. May provide an option to explicitly enable this later.
+        // For now use stdio of 'pipe' to get the output in the result object or 'inherit' to see it in the console.
+        // process.stdout.write(data) 
         result.stdout += data.toString()
       })
 
       // This event will only be emitted when stdio is NOT set to 'inherit'
       child.stderr?.on('data', (data) => {
-        process.stdout.write(data)
+        // Commenting this out for now. May provide an option to explicitly enable this later.
+        // For now use stdio of 'pipe' to get the output in the result object or 'inherit' to see it in the console.
+        // process.stdout.write(data)
         result.stderr += data.toString()
       })
 

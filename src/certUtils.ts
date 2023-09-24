@@ -1,30 +1,77 @@
 import fs from 'node:fs'
 import fsp from 'node:fs/promises'
 import path from 'node:path'
-import * as nodeCliUtils from './generalUtils.js'
-import { log } from './generalUtils.js'
+import {
+  Emoji,
+  SpawnOptionsWithThrow,
+  SpawnResult,
+  ensureDirectory,
+  getPowershellHackArgs,
+  isPlatformMac,
+  isPlatformWindows,
+  logIf,
+  red,
+  requireString,
+  requireValidPath,
+  simpleSpawnSync,
+  spawnAsync,
+  stringToNonEmptyLines,
+  whichSync
+} from './generalUtils.js'
 
-const requiresAdminMessage = `➡️ Important: Requires admin permissions`
+/** Control what is logged when running certUtils functions. */
+export interface CertLogOptions {
+  logSpawnOutput: boolean
+  logTraceMessages: boolean
+  logElevatedPermissionsMessage: boolean
+  logSuccess: boolean
+}
+
+export interface GenerateCertOptions extends CertLogOptions {
+  /** The directory to write the generated cert files to. Defaults to `./cert`. */
+  outputDirectory: string
+}
+
+const defaultCertLogOptions: CertLogOptions = {
+  logSpawnOutput: false,
+  logTraceMessages: false,
+  logElevatedPermissionsMessage: true,
+  logSuccess: true
+}
+
+/** Subject, thumbprint or path to the pfx file. Used with the {@link winUninstallCert} function. */
+export type CertIdentifier = string | { thumbprint: string } | { pfxPath: string }
+
+/** The subject or path to the pfx file. Used with the {@link winCertAlreadyInstalled} function. */
+export type CertIdentifierWithoutThumbprint = string | { pfxPath: string }
+
+/** Cert info returned by {@link winGetPfxInfo}. */
+export type CertInfo = { subject: string, thumbprint: string, pfxPath: string }
 
 /**
  * Wrapper function for calling openssl to generate a self-signed cert to be used for developing a local website with trusted https.
  * @param url The url to generate a cert for. This will be used as the common name (CN) in the cert as well as the filename for the generated cert files.
- * @param outputDirectory The directory to write the generated cert files to. Defaults to './cert'.
+ * @param options Options for generating the cert.
+ * @returns The path to the generated pfx file.
  */
-export async function generateCertWithOpenSsl(url: string, outputDirectory: string = './cert') {
-  nodeCliUtils.requireString('url', url)
+export async function generateCertWithOpenSsl(url: string, options?: Partial<GenerateCertOptions>): Promise<string> {
+  requireString('url', url)
   throwIfMaybeBadUrlChars(url)
-  const isMac = nodeCliUtils.isPlatformMac()
-  const spawnArgs = { cwd: outputDirectory }
+  const isMac = isPlatformMac()
 
-  log('- checking if openssl is installed')
+  const mergedOptions: GenerateCertOptions = { ...defaultCertLogOptions, outputDirectory: './cert', ...options }
+
+  const spawnArgs: SpawnOptionsWithThrow = { cwd: mergedOptions.outputDirectory, stdio: mergedOptions.logSpawnOutput ? 'inherit' : 'pipe' }
+
+  logIf(mergedOptions.logTraceMessages, 'checking if openssl is installed')
+
   let brewOpenSslPath: string = ''
   if (!isMac) {
-    const openSslPath = nodeCliUtils.whichSync('openssl').location
+    const openSslPath = whichSync('openssl').location
     if (!openSslPath) {
       throw Error('openssl is required but was not found')
     }
-    log(`- using openssl at: ${openSslPath}`)
+    logIf(mergedOptions.logTraceMessages, `using openssl at: ${openSslPath}`)
   } else if (isMac) {
     const brewOpenSslDirectory = getBrewOpensslPath()
     if (!brewOpenSslDirectory) {
@@ -34,100 +81,184 @@ export async function generateCertWithOpenSsl(url: string, outputDirectory: stri
     if (!fs.existsSync(brewOpenSslPath)) {
       throw Error(`openssl (brew version) is required but was not found at: ${brewOpenSslPath}`)
     } else {
-      log(`- using openssl at: ${brewOpenSslPath}`)
+      logIf(mergedOptions.logTraceMessages, `using openssl at: ${brewOpenSslPath}`)
     }
   }
 
-  nodeCliUtils.ensureDirectory(outputDirectory)
-  const keyName = url + '.key'
+  ensureDirectory(mergedOptions.outputDirectory)
   const crtName = url + '.crt'
+  const keyName = url + '.key'
   const pfxName = url + '.pfx'
-  const pfxPath = path.join(outputDirectory, pfxName)
-  if (fs.existsSync(pfxPath)) {
-    throw Error(`File ${pfxPath} already exists. Delete or rename this file if you want to generate a new cert.`)
+  const sanCnfName = url + '.cnf'
+
+  const filesToCheck = [crtName, keyName, pfxName, sanCnfName]
+  for (const file of filesToCheck) {
+    const filePath = path.join(mergedOptions.outputDirectory, file)
+    if (fs.existsSync(filePath)) {
+      throw Error(`${Emoji.Stop} File ${filePath} already exists. Delete or rename all of the following files from '${mergedOptions.outputDirectory}' if you want to generate a new cert: ${filesToCheck.join(', ')}.`)
+    }
   }
 
-  log('- writing san.cnf file for use with openssl command')
+  logIf(mergedOptions.logTraceMessages, `writing ${sanCnfName} file for use with openssl command`)
   const sanCnfContents = getSanCnfFileContents(url)
-  const sanCnfPath = path.join(outputDirectory, 'san.cnf')
+  const sanCnfPath = path.join(mergedOptions.outputDirectory, sanCnfName)
   await fsp.writeFile(sanCnfPath, sanCnfContents)
 
-  log(`- attempting to generate cert ${pfxName}`)
-  const genKeyAndCrtArgs = `req -x509 -newkey rsa:4096 -sha256 -days 3650 -nodes -keyout ${keyName} -out ${crtName} -subj /CN=${url} -config san.cnf`.split(' ')
+  logIf(mergedOptions.logTraceMessages, `attempting to generate cert ${pfxName}`)
+  const genKeyAndCrtArgs = `req -x509 -newkey rsa:4096 -sha256 -days 3650 -nodes -keyout ${keyName} -out ${crtName} -subj /CN=${url} -config ${sanCnfName}`.split(' ')
   const command = isMac ? brewOpenSslPath : 'openssl'
-  let result = await nodeCliUtils.spawnAsync(command, genKeyAndCrtArgs, spawnArgs)
-  if (result.code !== 0) {
-    throw Error(`openssl command to generate key and crt files failed with exit code ${result.code}`)
-  }
+  let result = await spawnAsync(command, genKeyAndCrtArgs, spawnArgs)
+  throwIfSpawnResultError(result)
 
-  log('- converting key and crt to pfx')
+  logIf(mergedOptions.logTraceMessages, 'converting key and crt to pfx')
   const convertToPfxArgs = `pkcs12 -certpbe AES-256-CBC -export -out ${pfxName} -aes256 -inkey ${keyName} -in ${crtName} -password pass:`.split(' ')
-  result = await nodeCliUtils.spawnAsync(command, convertToPfxArgs, spawnArgs)
-  if (result.code !== 0) {
-    throw Error(`openssl command to convert key and crt files to a pfx failed with exit code ${result.code}`)
-  }
+  result = await spawnAsync(command, convertToPfxArgs, spawnArgs)
+  throwIfSpawnResultError(result)
+
+  const pfxPath = path.join(mergedOptions.outputDirectory, pfxName)
+
+  logIf(mergedOptions.logSuccess, `${Emoji.GreenCheck} Successfully generated cert: ${pfxPath}`)
+
+  return pfxPath
 }
 
 /**
- * Uses Powershell to install a cert to the local machine's trusted root store. Must have admin permissions.
- * 
- * If the cert is already installed, this method will do nothing.
- * @param urlOrCertFilename The url or cert filename to install. The url + '.pfx' or the cert filename passed must match a file that exists in the certDirectory.
- * @param certDirectory The directory to look for the cert file in. Defaults to './cert'.
+ * Uses Powershell to install a cert to the local machine's trusted root store. Must have elevated permissions.
+ * If the cert is already installed, this function will do nothing.
+ * @param pfxPath The path to the pfx file to install.
  */
-export async function winInstallCert(urlOrCertFilename: string, certDirectory = './cert') {
-  if (!nodeCliUtils.isPlatformWindows()) {
+export async function winInstallCert(pfxPath: string, options?: Partial<CertLogOptions>) {
+  if (!isPlatformWindows()) {
     throw Error('winInstallCert is only supported on Windows')
   }
-  nodeCliUtils.requireString('urlOrCertFilename', urlOrCertFilename)
-  nodeCliUtils.requireValidPath('certDirectory', certDirectory)
-  throwIfMaybeBadUrlChars(urlOrCertFilename, 'urlOrCertFilename')
+  validatePfxPath(pfxPath)
 
-  if (!nodeCliUtils.isPlatformWindows()) {
-    throw Error('This method is only supported on Windows')
-  }
+  const mergedOptions = { ...defaultCertLogOptions, ...options }
 
-  log(requiresAdminMessage)
+  logIf(mergedOptions.logElevatedPermissionsMessage, getRequiresElevatedPermissionsMessage(true))
 
-  if (await winCertAlreadyInstalled(urlOrCertFilename)) {
-    log(`certificate for ${urlOrCertFilename} is already installed - to install it again, first uninstall it manually or with the winUninstallCert method`)
+  if (await winCertAlreadyInstalled({ pfxPath }, mergedOptions)) {
+    const certInfo = await winGetPfxInfo(pfxPath)
+    logIf(mergedOptions.logTraceMessages, `${Emoji.Warning} certificate '${pfxPath}' with subject '${certInfo.subject}' is already installed - to install it again, first uninstall it manually or with the winUninstallCert function`)
     return
   }
 
-  const certName = urlOrCertFilename.endsWith('.pfx') ? urlOrCertFilename : urlOrCertFilename + '.pfx'
+  logIf(mergedOptions.logTraceMessages, `installing cert '${pfxPath}'`)
 
-  const certPath = path.join(certDirectory, certName)
+  const psCommandArgs = getPowershellHackArgs(`Import-PfxCertificate -FilePath '${pfxPath}' -CertStoreLocation Cert:\\LocalMachine\\Root`)
+  const result = await spawnAsync('powershell', psCommandArgs, { stdio: mergedOptions.logSpawnOutput ? 'inherit' : 'pipe' })
 
-  if (!fs.existsSync(certPath)) {
-    throw Error(`File ${certPath} does not exist. Generate this first if you want to install it.`)
-  }
+  throwIfSpawnResultError(result)
 
-  const psCommandArgs = nodeCliUtils.getPowershellHackArgs(`Import-PfxCertificate -FilePath '${certPath}' -CertStoreLocation Cert:\\LocalMachine\\Root`)
-  const result = await nodeCliUtils.spawnAsync('powershell', psCommandArgs)
-
-  if (result.code !== 0) {
-    throw Error(`powershell command to install cert failed with exit code ${result.code}`)
-  }
+  logIf(mergedOptions.logSuccess, `${Emoji.GreenCheck} Successfully installed cert: ${pfxPath}`)
 }
 
 /**
- * Uses Powershell to uninstall a cert from the local machine's trusted root store. Must have admin permissions.
- * @param urlOrSubject The url or subject of the cert to uninstall. If the cert was installed with the winInstallCert method, this will be the url passed to that method.
+ * Uses Powershell to check if a cert is already installed to the local machine's trusted root store.
+ * Uses the subject of the cert in order to avoid false negatives from regenerating the same self-signed cert
+ * with the same subject but different thumbprint. Note that this method is geared towards use with certs generated
+ * with the {@link generateCertWithOpenSsl} function, so this may not work using subject if your subject is not precisely "`CN=<url>`".
+ * @param identifier The subject or path to the pfx file of the cert to check.
+ * @returns `true` if the cert is already installed, `false` otherwise.
  */
-export async function winUninstallCert(urlOrSubject: string) {
-  if (!nodeCliUtils.isPlatformWindows()) {
-    throw Error('winUninstallCert is only supported on Windows')
+export async function winCertAlreadyInstalled(identifier: CertIdentifierWithoutThumbprint, options?: Partial<CertLogOptions>): Promise<boolean> {
+  if (!isPlatformWindows()) {
+    throw new Error('winCertAlreadyInstalled is only supported on Windows')
   }
-  nodeCliUtils.requireString('urlOrSubject', urlOrSubject)
 
-  log(requiresAdminMessage)
+  const mergedOptions = { ...defaultCertLogOptions, ...options }
 
-  const psCommandArgs = nodeCliUtils.getPowershellHackArgs(`Get-ChildItem Cert:\\LocalMachine\\Root | Where-Object { $_.Subject -match '${urlOrSubject}' } | Remove-Item`)
-  const result = await nodeCliUtils.spawnAsync('powershell', psCommandArgs)
+  let psCommandArgs
 
-  if (result.code !== 0) {
-    throw Error(`powershell command to uninstall cert failed with exit code ${result.code}`)
+  // Get the count of certs installed with the same subject as the one we're trying to install
+  if (typeof identifier === 'string') {
+    requireString('subject', identifier)
+    validateSubject(identifier)
+    const subject = identifier.startsWith('CN=') ? identifier : `CN=${identifier}`
+    psCommandArgs = getPowershellHackArgs(`Write-Host (Get-ChildItem Cert:\\LocalMachine\\Root | Where-Object { $_.Subject -eq '${subject}' } | Measure-Object).Count`)
+  } else if ('pfxPath' in identifier) {
+    validatePfxPath(identifier.pfxPath)
+    psCommandArgs = getPowershellHackArgs(`Write-Host (Get-ChildItem Cert:\\LocalMachine\\Root | Where-Object { $_.Subject -eq (Get-PfxCertificate -FilePath '${identifier.pfxPath}').Subject } | Measure-Object).Count`)
   }
+
+  logIf(mergedOptions.logTraceMessages, `checking if cert '${typeof identifier === 'string' ? `with subject '${identifier}` : `with pfxPath ${identifier.pfxPath}`}' is already installed`)
+
+  const result = await spawnAsync('powershell', psCommandArgs, { stdio: 'pipe' })
+
+  throwIfSpawnResultError(result)
+
+  const lines = stringToNonEmptyLines(result.stdout)
+
+  if (lines.length !== 1) {
+    throw new Error(`Unexpected output from powershell command to check if the cert is already installed: ${result.stdout}`)
+  }
+
+  return lines[0].trim() !== '0'
+}
+
+/**
+ * Uses Powershell to uninstall a cert from the local machine's trusted root store. Must have elevated permissions.
+ * @param identifier The subject, thumbprint or path to the pfx file of the cert to uninstall.
+ * @param options Options for uninstalling the cert.
+ */
+export async function winUninstallCert(identifier: CertIdentifier, options?: Partial<CertLogOptions>) {
+  if (!isPlatformWindows()) {
+    throw new Error('winUninstallCert is only supported on Windows')
+  }
+
+  const mergedOptions = { ...defaultCertLogOptions, ...options }
+
+  logIf(mergedOptions.logElevatedPermissionsMessage, getRequiresElevatedPermissionsMessage(false))
+
+  let psCommandArgs
+
+  if (typeof identifier === 'string') {
+    requireString('subject', identifier)
+    validateSubject(identifier)
+    psCommandArgs = getPowershellHackArgs(`Get-ChildItem Cert:\\LocalMachine\\Root | Where-Object { $_.Subject -match '${identifier}' } | Remove-Item`)
+  } else if ('thumbprint' in identifier) {
+    validateNoQuotes('thumbprint', identifier.thumbprint)
+    psCommandArgs = getPowershellHackArgs(`Get-ChildItem Cert:\\LocalMachine\\Root | Where-Object { $_.Thumbprint -eq '${identifier.thumbprint}' } | Remove-Item`)
+  } else if ('pfxPath' in identifier) {
+    validatePfxPath(identifier.pfxPath)
+    psCommandArgs = getPowershellHackArgs(`$thumbprint = (Get-PfxCertificate -FilePath '${identifier.pfxPath}').Thumbprint; Get-ChildItem Cert:\\LocalMachine\\Root | Where-Object { $_.Thumbprint -eq $thumbprint } | Remove-Item`)
+  }
+
+  logIf(mergedOptions.logTraceMessages, `uninstalling cert ${typeof identifier === 'string' ? `'${identifier}'` : JSON.stringify(identifier)}`)
+
+  const result = await spawnAsync('powershell', psCommandArgs, { stdio: mergedOptions.logSpawnOutput ? 'inherit' : 'pipe' })
+
+  throwIfSpawnResultError(result)
+
+  logIf(mergedOptions.logSuccess, `${Emoji.GreenCheck} Successfully uninstalled cert`)
+}
+
+/**
+ * Uses Powershell to get info about a cert.
+ * @param pfxPath The path to the pfx file to get info for.
+ * @returns The subject, thumbprint and pfxPath of the cert.
+ */
+export async function winGetPfxInfo(pfxPath: string): Promise<CertInfo> {
+  if (!isPlatformWindows()) {
+    throw new Error('winGetPfxInfo is only supported on Windows')
+  }
+  validatePfxPath(pfxPath)
+
+  const psCommandArgs = getPowershellHackArgs(`Get-PfxCertificate -FilePath '${pfxPath}' | Select-Object -Property Subject, Thumbprint, @{Name='PfxPath';Expression={'${pfxPath}'}} | ConvertTo-Json`)
+  const result = await spawnAsync('powershell', psCommandArgs, { stdio: 'pipe' })
+
+  throwIfSpawnResultError(result)
+
+  const json = result.stdout.trim()
+  const parsedJson = JSON.parse(json)
+
+  const certInfo: CertInfo = {
+    subject: parsedJson.Subject,
+    thumbprint: parsedJson.Thumbprint,
+    pfxPath: parsedJson.PfxPath
+  }
+
+  return certInfo
 }
 
 /**
@@ -138,40 +269,11 @@ export function linuxInstallCert() {
 Manual Instructions:
 - In Chrome, go to chrome://settings/certificates
 - Select Authorities -> import
-- Select your generated .crt file (in the ./cert/ directory by default - if you haven't generated it, see the generateCertWithOpenSsl method)
+- Select your generated .crt file (in the ./cert/ directory by default - if you haven't generated it, see the generateCertWithOpenSsl function)
 - Check box for "Trust certificate for identifying websites"
 - Click OK
 - Reload site`
   console.log(instructions)
-}
-
-/**
- * Uses Powershell to check if a cert is already installed to the local machine's trusted root store.
- * @param urlOrSubject The url or subject of the cert to check. If the cert was installed with the winInstallCert method, this will be the url passed to that method.
- * @returns `true` if the cert is already installed, `false` otherwise.
- */
-export async function winCertAlreadyInstalled(urlOrSubject: string): Promise<boolean> {
-  if (!nodeCliUtils.isPlatformWindows()) {
-    throw Error('winCertAlreadyInstalled is only supported on Windows')
-  }
-  const psCommandArgs = nodeCliUtils.getPowershellHackArgs(`Get-ChildItem Cert:\\LocalMachine\\Root | Where-Object { $_.Subject -match '${urlOrSubject}' }`)
-
-  // The stdio option of 'pipe' is important here - if left to default of spawnAsync ('inherit'), stdout will be empty
-  const result = await nodeCliUtils.spawnAsync('powershell', psCommandArgs, { stdio: ['inherit', 'pipe', 'pipe'] })
-
-  if (result.code !== 0) {
-    throw Error(`powershell command to find installed cert failed with exit code ${result.code}`)
-  }
-
-  const lines = nodeCliUtils.stringToNonEmptyLines(result.stdout)
-
-  for (const line of lines) {
-    if (line.includes(urlOrSubject)) {
-      return true
-    }
-  }
-
-  return false
 }
 
 function throwIfMaybeBadUrlChars(url: string, varName = 'url') {
@@ -187,7 +289,7 @@ function throwIfMaybeBadUrlChars(url: string, varName = 'url') {
 }
 
 function getBrewOpensslPath(): string {
-  const brewResult = nodeCliUtils.simpleSpawnSync('brew', ['--prefix', 'openssl'])
+  const brewResult = simpleSpawnSync('brew', ['--prefix', 'openssl'])
   if (brewResult.error) {
     throw Error('error attempting to find openssl installed by brew')
   }
@@ -199,6 +301,41 @@ function getBrewOpensslPath(): string {
 
 function getSanCnfFileContents(url: string) {
   return sanCnfTemplate.replace(/{{url}}/g, url)
+}
+
+function validateSubject(subject: string): void {
+  if (subject.includes('\\') || subject.includes('/') || subject.endsWith('.pfx')) {
+    throw new Error(`The subject appears to be a file path, which is not allowed. Did you mean to pass something like this instead: { pfxPath: '${subject}' } ?`)
+  }
+  validateNoQuotes('subject', subject)
+}
+
+function validateNoQuotes(name: string, value: string): void {
+  if (value.includes("'") || value.includes('"')) {
+    throw new Error(`The value passed for '${name}' contains a single or double quote, which is not allowed.`)
+  }
+}
+
+function throwIfSpawnResultError(result: SpawnResult) {
+  if (result.code !== 0) {
+    // There won't be any stderr if stdio was set to 'inherit', so we're checking first
+    if (result.stderr) {
+      console.error(red('Error:'), result.stderr)
+    }
+    throw Error(`Spawned command failed with exit code ${result.code}`)
+  }
+}
+
+function validatePfxPath(pfxPath: string): void {
+  if (!pfxPath.endsWith('.pfx')) {
+    throw new Error('pfxPath must end with .pfx')
+  }
+  requireValidPath('pfxPath', pfxPath)
+  validateNoQuotes('pfxPath', pfxPath)
+}
+
+function getRequiresElevatedPermissionsMessage(isInstall = true) {
+  return `${Emoji.Info} Important: ${isInstall ? '' : 'un'}installing a certificate requires elevated permissions`
 }
 
 // Newer cert requirements force the need for "extension info" with DNS and IP info, but openssl v1.x doesn't support that with the

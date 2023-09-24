@@ -3,7 +3,7 @@ import fsp from 'node:fs/promises'
 
 export const tmpDir = './test/tmp'
 export const fixturesDir = './test/fixtures'
-export const only = { only: true } // Convenience object to make it easier to mark tests as "only" in the test runner
+export const only = { only: true } // Convenience object to make it easier to mark tests as "only"
 
 export const ensureEmptyTmpDir = async (dir: string) => {
   if (!dir) {
