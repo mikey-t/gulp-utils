@@ -7,6 +7,7 @@ const tscPath = './node_modules/typescript/lib/tsc.js'
 const typedocPath = './node_modules/typedoc/dist/lib/cli.js'
 const baseTestArgs = ['--no-warnings', '--loader', 'tsx']
 const testFiles = [
+  './test/generalUtils.test.ts',
   './test/findFilesRecursively.test.ts',
   './test/TarballUtility.test.ts',
 ]

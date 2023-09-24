@@ -787,3 +787,57 @@ export function logTable(data: string[][]): void {
     if (i === 0) log(lineSeparator)
   }
 }
+
+/**
+ * See {@link getPowershellHackArgs}.
+ */
+export const powershellHackPrefix = `$env:PSModulePath = [Environment]::GetEnvironmentVariable('PSModulePath', 'Machine'); `
+
+/**
+ * Powershell doesn't load the system PSModulePath when running in a non-interactive shell.
+ * This is a workaround to set the PSModulePath environment variable to the system value before running a powershell command.
+ * @param command The powershell command to run
+ * @returns An array of arguments to pass to spawnAsync
+ */
+export function getPowershellHackArgs(command: string): string[] {
+  return ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', `${powershellHackPrefix}${command}`]
+}
+
+/**
+ * Returns a humanized string representation of the number of milliseconds using ms, seconds, minutes, or hours.
+ * @param milliseconds The number of milliseconds to humanize
+ * @returns A humanized string representation of the number
+ */
+export function humanizeTime(milliseconds: number) {
+  let value: number
+  let unit: string
+
+  if (milliseconds < 1000) {
+    return `${milliseconds} ms`
+  }
+
+  if (milliseconds < 60000) {
+    value = milliseconds / 1000
+    unit = 'second'
+  } else if (milliseconds < 3600000) {
+    value = milliseconds / 60000
+    unit = 'minute'
+  } else {
+    value = milliseconds / 3600000
+    unit = 'hour'
+  }
+
+  let stringValue = value.toFixed(2)
+
+  if (stringValue.endsWith('.00')) {
+    stringValue = stringValue.slice(0, -3)
+  } else if (stringValue.endsWith('0')) {
+    stringValue = stringValue.slice(0, -1)
+  }
+
+  if (stringValue !== '1') {
+    unit += 's'
+  }
+
+  return `${stringValue} ${unit}`
+}

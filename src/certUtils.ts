@@ -5,7 +5,6 @@ import * as nodeCliUtils from './generalUtils.js'
 import { log } from './generalUtils.js'
 
 const requiresAdminMessage = `➡️ Important: Requires admin permissions`
-const powershellHackPrefix = `$env:PSModulePath = [Environment]::GetEnvironmentVariable('PSModulePath', 'Machine'); `
 
 /**
  * Wrapper function for calling openssl to generate a self-signed cert to be used for developing a local website with trusted https.
@@ -77,6 +76,9 @@ export async function generateCertWithOpenSsl(url: string, outputDirectory: stri
  * @param certDirectory The directory to look for the cert file in. Defaults to './cert'.
  */
 export async function winInstallCert(urlOrCertFilename: string, certDirectory = './cert') {
+  if (!nodeCliUtils.isPlatformWindows()) {
+    throw Error('winInstallCert is only supported on Windows')
+  }
   nodeCliUtils.requireString('urlOrCertFilename', urlOrCertFilename)
   nodeCliUtils.requireValidPath('certDirectory', certDirectory)
   throwIfMaybeBadUrlChars(urlOrCertFilename, 'urlOrCertFilename')
@@ -100,9 +102,9 @@ export async function winInstallCert(urlOrCertFilename: string, certDirectory = 
     throw Error(`File ${certPath} does not exist. Generate this first if you want to install it.`)
   }
 
-  const psCommand = `${powershellHackPrefix}Import-PfxCertificate -FilePath '${certPath}' -CertStoreLocation Cert:\\LocalMachine\\Root`
+  const psCommandArgs = nodeCliUtils.getPowershellHackArgs(`Import-PfxCertificate -FilePath '${certPath}' -CertStoreLocation Cert:\\LocalMachine\\Root`)
+  const result = await nodeCliUtils.spawnAsync('powershell', psCommandArgs)
 
-  const result = await nodeCliUtils.spawnAsync('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', psCommand])
   if (result.code !== 0) {
     throw Error(`powershell command to install cert failed with exit code ${result.code}`)
   }
@@ -113,13 +115,15 @@ export async function winInstallCert(urlOrCertFilename: string, certDirectory = 
  * @param urlOrSubject The url or subject of the cert to uninstall. If the cert was installed with the winInstallCert method, this will be the url passed to that method.
  */
 export async function winUninstallCert(urlOrSubject: string) {
+  if (!nodeCliUtils.isPlatformWindows()) {
+    throw Error('winUninstallCert is only supported on Windows')
+  }
   nodeCliUtils.requireString('urlOrSubject', urlOrSubject)
 
   log(requiresAdminMessage)
 
-  const psCommand = `${powershellHackPrefix}Get-ChildItem Cert:\\LocalMachine\\Root | Where-Object { $_.Subject -match '${urlOrSubject}' } | Remove-Item`
-
-  const result = await nodeCliUtils.spawnAsync('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', psCommand])
+  const psCommandArgs = nodeCliUtils.getPowershellHackArgs(`Get-ChildItem Cert:\\LocalMachine\\Root | Where-Object { $_.Subject -match '${urlOrSubject}' } | Remove-Item`)
+  const result = await nodeCliUtils.spawnAsync('powershell', psCommandArgs)
 
   if (result.code !== 0) {
     throw Error(`powershell command to uninstall cert failed with exit code ${result.code}`)
@@ -147,10 +151,13 @@ Manual Instructions:
  * @returns `true` if the cert is already installed, `false` otherwise.
  */
 export async function winCertAlreadyInstalled(urlOrSubject: string): Promise<boolean> {
-  const psCommand = `${powershellHackPrefix}Get-ChildItem Cert:\\LocalMachine\\Root | Where-Object { $_.Subject -match '${urlOrSubject}' }`
+  if (!nodeCliUtils.isPlatformWindows()) {
+    throw Error('winCertAlreadyInstalled is only supported on Windows')
+  }
+  const psCommandArgs = nodeCliUtils.getPowershellHackArgs(`Get-ChildItem Cert:\\LocalMachine\\Root | Where-Object { $_.Subject -match '${urlOrSubject}' }`)
 
   // The stdio option of 'pipe' is important here - if left to default of spawnAsync ('inherit'), stdout will be empty
-  const result = await nodeCliUtils.spawnAsync('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', psCommand], { stdio: ['inherit', 'pipe', 'pipe'] })
+  const result = await nodeCliUtils.spawnAsync('powershell', psCommandArgs, { stdio: ['inherit', 'pipe', 'pipe'] })
 
   if (result.code !== 0) {
     throw Error(`powershell command to find installed cert failed with exit code ${result.code}`)
