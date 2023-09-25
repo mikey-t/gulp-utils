@@ -6,3 +6,4 @@ dist
 test/tmp/*
 !test/tmp/placeholder.txt
 .scannerwork
+coverage

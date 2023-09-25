@@ -6,13 +6,16 @@ import fsp from 'node:fs/promises'
 const tscPath = './node_modules/typescript/lib/tsc.js'
 const eslintPath = './node_modules/eslint/bin/eslint.js'
 const typedocPath = './node_modules/typedoc/dist/lib/cli.js'
-const baseTestArgs = ['--no-warnings', '--loader', 'tsx']
+const c8Path = './node_modules/c8/bin/c8.js'
+const loaderArgsTsx = ['--no-warnings', '--loader', 'tsx']
+// const baseTestArgs = ['--loader', 'tsx']
+const loaderArgsTsNode = ['--no-warnings', '--loader', 'ts-node/esm']
 const testFiles = [
   './test/generalUtils.test.ts',
   './test/findFilesRecursively.test.ts',
   './test/TarballUtility.test.ts',
   // These only work on windows and are quite slow - uncomment this to run them only when making changes to certUtils.ts
-  // './test/certUtils.test.ts', 
+  './test/certUtils.test.ts', 
 ]
 
 export const build = series(cleanDist, parallel(buildEsm, series(buildCjs, copyCjsPackageJson)))
@@ -28,28 +31,35 @@ export async function genDocs() {
 }
 
 export async function test() {
-  if ((await spawnAsync('node', [...baseTestArgs, '--test', ...testFiles])).code !== 0) {
+  if ((await spawnAsync('node', [...loaderArgsTsx, '--test', ...testFiles])).code !== 0) {
     throw new Error('Tests failed')
   }
 }
 
 export async function testWatch() {
-  const args = [...baseTestArgs, '--test', '--watch', ...testFiles]
+  const args = [...loaderArgsTsx, '--test', '--watch', ...testFiles]
   if ((await spawnAsyncLongRunning('node', args)).code !== 0) {
     throw new Error('Tests failed')
   }
 }
 
 export async function testOnly() {
-  const args = [...baseTestArgs, '--test-only', '--test', ...testFiles]
+  const args = [...loaderArgsTsx, '--test-only', '--test', ...testFiles]
   if ((await spawnAsync('node', args)).code !== 0) {
     throw new Error('Tests failed')
   }
 }
 
 export async function testOnlyWatch() {
-  const args = [...baseTestArgs, '--test-only', '--test', '--watch', ...testFiles]
+  const args = [...loaderArgsTsx, '--test-only', '--test', '--watch', ...testFiles]
   if ((await spawnAsyncLongRunning('node', args)).code !== 0) {
+    throw new Error('Tests failed')
+  }
+}
+
+export async function testCoverage() {
+  const args = [c8Path, 'node', ...loaderArgsTsNode, '--test', ...testFiles]
+  if ((await spawnAsync('node', args, { env: { ...process.env, NODE_V8_COVERAGE: './coverage' } })).code !== 0) {
     throw new Error('Tests failed')
   }
 }
