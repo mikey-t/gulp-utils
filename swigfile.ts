@@ -15,7 +15,7 @@ const testFiles = [
   './test/findFilesRecursively.test.ts',
   './test/TarballUtility.test.ts',
   // These only work on windows and are quite slow - uncomment this to run them only when making changes to certUtils.ts
-  './test/certUtils.test.ts', 
+  // './test/certUtils.test.ts', 
 ]
 
 export const build = series(cleanDist, parallel(buildEsm, series(buildCjs, copyCjsPackageJson)))

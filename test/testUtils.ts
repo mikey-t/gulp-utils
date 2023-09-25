@@ -1,3 +1,4 @@
+import assert from 'node:assert'
 import fs from 'node:fs'
 import fsp from 'node:fs/promises'
 
@@ -25,4 +26,14 @@ export function fileExistsAndIsNonZero(filePath: string): boolean {
   } catch (err) {
     return false
   }
+}
+
+export function assertErrorMessageStartsWith(err: unknown, startsWithString: string) {
+  assert.strictEqual(err instanceof Error && err.message.startsWith(startsWithString), true)
+  return true
+}
+
+export function assertErrorMessageIncludes(err: unknown, includesString: string) {
+  assert.strictEqual(err instanceof Error && err.message.includes(includesString), true)
+  return true
 }

@@ -1,5 +1,4 @@
 import fs from 'node:fs'
-import fsp from 'node:fs/promises'
 import path from 'node:path'
 import { mkdirp, requireString, requireValidPath, spawnAsync, trace, whichSync } from './generalUtils.js'
 import { config } from './NodeCliUtilsConfig.js'
@@ -13,9 +12,9 @@ export interface CreateTarballOptions {
 }
 
 export interface TarballUnpackOptions {
-  createDirIfNotExists?: boolean
-  stripComponents?: number
-  throwOnNonEmptyUnpackDir?: boolean
+  createDirIfNotExists: boolean
+  stripComponents: number
+  throwOnNonEmptyUnpackDir: boolean
 }
 
 /**
@@ -49,10 +48,6 @@ export class TarballUtility {
       throw new Error('tar command not found - please install tar on your OS to use this method, or consider using the npm package node-tar instead')
     }
 
-    if (!fs.existsSync(directoryToTarball)) {
-      throw new Error(`directoryToTarball does not exist: ${directoryToTarball}`)
-    }
-
     if (tarballPath.endsWith('.tar.gz') === false) {
       throw new Error(`tarballPath must end with '.tar.gz': ${tarballPath}`)
     }
@@ -61,14 +56,12 @@ export class TarballUtility {
     const directoryToTarballName = path.basename(directoryToTarball)
 
     const outputDirectory = path.dirname(tarballPath)
-    const tarballName = path.basename(tarballPath)
 
     if (!fs.existsSync(outputDirectory)) {
       trace(`tarballPath directory does not exist - creating '${outputDirectory}'`)
       await mkdirp(outputDirectory)
     } else if (fs.existsSync(tarballPath)) {
-      trace(`removing existing tarball '${tarballName}' before creating new one`)
-      await fsp.unlink(tarballPath)
+      throw new Error(`tarballPath already exists - delete, move or rename it first: ${tarballPath}`)
     }
 
     const excludesArgs = mergedOptions.excludes.length > 0 ? mergedOptions.excludes.map(exclude => `--exclude=${exclude}`) : []
@@ -91,7 +84,7 @@ export class TarballUtility {
    * @param unpackDirectory The directory to unpack the tarball into
    * @param options The options to use when unpacking the tarball. See {@link TarballUnpackOptions}.
    */
-  unpackTarball = async (tarballPath: string, unpackDirectory: string, options?: TarballUnpackOptions) => {
+  unpackTarball = async (tarballPath: string, unpackDirectory: string, options?: Partial<TarballUnpackOptions>) => {
     requireValidPath('tarballPath', tarballPath)
     requireString('unpackDirectory', unpackDirectory)
 

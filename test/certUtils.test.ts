@@ -3,7 +3,7 @@ import fsp from 'node:fs/promises'
 import path from 'node:path'
 import { beforeEach, describe, it } from 'node:test'
 import { GenerateCertOptions, generateCertWithOpenSsl, winCertIsInstalled, winGetPfxInfo, winInstallCert, winUninstallCert } from '../src/certUtils.js'
-import { ensureEmptyTmpDir, fileExistsAndIsNonZero, tmpDir } from './testUtils.js'
+import { assertErrorMessageIncludes, ensureEmptyTmpDir, fileExistsAndIsNonZero, tmpDir } from './testUtils.js'
 
 const certTempDir = path.join(tmpDir, 'cert-test')
 const shouldLog = false
@@ -48,10 +48,7 @@ describe('generateCertWithOpenSsl', () => {
       const expectedErrorPart = expectedErrorPartTemplate.replace('__ext__', ext)
       await assert.rejects(
         async () => await generateCertWithOpenSsl(url, certOptions),
-        err => {
-          assert.ok(err instanceof Error && err.message.includes(expectedErrorPart))
-          return true
-        }
+        err => assertErrorMessageIncludes(err, expectedErrorPart)
       )
       await fsp.unlink(path.join(certTempDir, `${url}.${ext}`))
     }

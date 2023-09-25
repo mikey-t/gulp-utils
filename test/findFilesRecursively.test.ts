@@ -113,12 +113,18 @@ describe('findFilesRecursively', () => {
 
   it('throws if pattern param is more than 50 characters', async () => {
     const pattern = 'a'.repeat(51)
-    await assert.rejects(async () => await findFilesRecursively(searchDir, pattern), { name: 'Error', message: 'filenamePattern param must have fewer than 50 characters', })
+    await assert.rejects(
+      async () => await findFilesRecursively(searchDir, pattern),
+      { name: 'Error', message: 'filenamePattern param must have fewer than 50 characters' }
+    )
   })
 
   it('throws if there are more than 5 wildcard characters in pattern param', async () => {
     const pattern = 'a*'.repeat(6)
-    await assert.rejects(async () => await findFilesRecursively(searchDir, pattern), { name: 'Error', message: 'filenamePattern param must contain 5 or fewer wildcards', })
+    await assert.rejects(
+      async () => await findFilesRecursively(searchDir, pattern),
+      { name: 'Error', message: 'filenamePattern param must contain 5 or fewer wildcards', }
+    )
   })
 
   it('successfully handles cases where the wildcard is the last character in the pattern', async () => {
@@ -139,10 +145,16 @@ describe('findFilesRecursively', () => {
   })
 
   it('does not allow forward slashes in the filePattern param', async () => {
-    await assert.rejects(async () => await findFilesRecursively(searchDir, 'dirA/second-level*'), { name: 'Error', message: 'filenamePattern param must not contain slashes', })
+    await assert.rejects(
+      async () => await findFilesRecursively(searchDir, 'dirA/second-level*'),
+      { name: 'Error', message: 'filenamePattern param must not contain slashes', }
+    )
   })
 
   it('does not allow back slashes in the filePattern param', async () => {
-    await assert.rejects(async () => await findFilesRecursively(searchDir, 'dirA\\second-level*'), { name: 'Error', message: 'filenamePattern param must not contain slashes', })
+    await assert.rejects(
+      async () => await findFilesRecursively(searchDir, 'dirA\\second-level*'),
+      { name: 'Error', message: 'filenamePattern param must not contain slashes', }
+    )
   })
 })
