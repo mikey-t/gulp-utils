@@ -147,12 +147,16 @@ export interface SpawnOptionsWithThrow extends SpawnOptions {
 }
 
 /**
- * This is a wrapper function for NodeJS. Defaults stdio to inherit so that output is visible in the console,
+ * This is a wrapper function for NodeJS spawn. Defaults stdio to inherit so that output is visible in the console,
  * but note that this means stdout and stderr will not be available in the returned SpawnResult. To hide the output
  * from the console but collect the stdout and stderr in the SpawnResult, use stdio: 'pipe'.
  * 
  * When spawning long-running processes, use {@link spawnAsyncLongRunning} instead so that unexpected
  * termination of the parent process will not orphan the child process tree on windows.
+ * 
+ * **Warning:** Do NOT use this for generating commands dynamically from user input as it could be used to execute arbitrary code.
+ * This is meant solely for building up known commands that are not made up of unsanitized user input, and only at compile time.
+ * See {@link winInstallCert} and {@link winUninstallCert} for examples of taking user input and inserting it safely into known commands.
  * @param command The command to spawn
  * @param args The arguments to pass to the command
  * @param options The options to pass to the command
@@ -165,6 +169,10 @@ export async function spawnAsync(command: string, args?: string[], options?: Spa
 /**
  * Use this alternate spawn wrapper instead of {@link spawnAsync} when spawning long-running processes to
  * avoid orphaned child process trees on Windows.
+ * 
+ * **Warning:** Do NOT use this for generating commands dynamically from user input as it could be used to execute arbitrary code.
+ * This is meant solely for building up known commands that are not made up of unsanitized user input, and only at compile time.
+ * See {@link winInstallCert} and {@link winUninstallCert} for examples of taking user input and inserting it safely into known commands.
  * @param command The command to spawn
  * @param args The arguments to pass to the command
  * @param cwd The current working directory to run the command from - defaults to process.cwd()
@@ -418,6 +426,10 @@ export function stringToNonEmptyLines(str: string): string[] {
  * Use this for simple quick commands that don't require a lot of control.
  * 
  * For commands that aren't Windows and CMD specific, use {@link simpleSpawnSync}.
+ * 
+ * **Warning:** Do NOT use this for generating commands dynamically from user input as it could be used to execute arbitrary code.
+ * This is meant solely for building up known commands that are not made up of unsanitized user input, and only at compile time.
+ * See {@link winInstallCert} and {@link winUninstallCert} for examples of taking user input and inserting it safely into known commands.
  * @param command Command to run
  * @param args Arguments to pass to the command
  * @returns An object with the status code, stdout, stderr, and error (if any)
@@ -436,6 +448,10 @@ export function simpleCmdSync(command: string, args?: string[], throwOnNonZero: 
  * Use this for simple quick commands that don't require a lot of control.
  * 
  * For commands that are Windows and CMD specific, use {@link simpleCmdSync}.
+ * 
+ * **Warning:** Do NOT use this for generating commands dynamically from user input as it could be used to execute arbitrary code.
+ * This is meant solely for building up known commands that are not made up of unsanitized user input, and only at compile time.
+ * See {@link winInstallCert} and {@link winUninstallCert} for examples of taking user input and inserting it safely into known commands.
  * @param command Command to run
  * @param args Arguments to pass to the command
  * @returns An object with the status code, stdout, stderr, and error (if any)
