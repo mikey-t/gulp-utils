@@ -42,7 +42,7 @@ const defaultCertLogOptions: CertLogOptions = {
 /** Subject, thumbprint or path to the pfx file. Used with the {@link winUninstallCert} function. */
 export type CertIdentifier = string | { thumbprint: string } | { pfxPath: string }
 
-/** The subject or path to the pfx file. Used with the {@link winCertAlreadyInstalled} function. */
+/** The subject or path to the pfx file. Used with the {@link winCertIsInstalled} function. */
 export type CertIdentifierWithoutThumbprint = string | { pfxPath: string }
 
 /** Cert info returned by {@link winGetPfxInfo}. */
@@ -137,7 +137,7 @@ export async function winInstallCert(pfxPath: string, options?: Partial<CertLogO
 
   logIf(mergedOptions.logElevatedPermissionsMessage, getRequiresElevatedPermissionsMessage(true))
 
-  if (await winCertAlreadyInstalled({ pfxPath }, mergedOptions)) {
+  if (await winCertIsInstalled({ pfxPath }, mergedOptions)) {
     const certInfo = await winGetPfxInfo(pfxPath)
     logIf(mergedOptions.logTraceMessages, `${Emoji.Warning} certificate '${pfxPath}' with subject '${certInfo.subject}' is already installed - to install it again, first uninstall it manually or with the winUninstallCert function`)
     return
@@ -161,9 +161,9 @@ export async function winInstallCert(pfxPath: string, options?: Partial<CertLogO
  * @param identifier The subject or path to the pfx file of the cert to check.
  * @returns `true` if the cert is already installed, `false` otherwise.
  */
-export async function winCertAlreadyInstalled(identifier: CertIdentifierWithoutThumbprint, options?: Partial<CertLogOptions>): Promise<boolean> {
+export async function winCertIsInstalled(identifier: CertIdentifierWithoutThumbprint, options?: Partial<CertLogOptions>): Promise<boolean> {
   if (!isPlatformWindows()) {
-    throw new Error('winCertAlreadyInstalled is only supported on Windows')
+    throw new Error('winCertIsInstalled is only supported on Windows')
   }
 
   const mergedOptions = { ...defaultCertLogOptions, ...options }

@@ -2,7 +2,7 @@ import assert from 'node:assert'
 import fsp from 'node:fs/promises'
 import path from 'node:path'
 import { beforeEach, describe, it } from 'node:test'
-import { GenerateCertOptions, generateCertWithOpenSsl, winCertAlreadyInstalled, winGetPfxInfo, winInstallCert, winUninstallCert } from '../src/certUtils.js'
+import { GenerateCertOptions, generateCertWithOpenSsl, winCertIsInstalled, winGetPfxInfo, winInstallCert, winUninstallCert } from '../src/certUtils.js'
 import { ensureEmptyTmpDir, fileExistsAndIsNonZero, tmpDir } from './testUtils.js'
 
 const certTempDir = path.join(tmpDir, 'cert-test')
@@ -99,9 +99,9 @@ describe('winInstallCert and winUninstallCert (must be run as admin)', () => {
   })
 })
 
-describe('winCertAlreadyInstalled', () => {
+describe('winCertIsInstalled', () => {
   it('returns false when the cert is not installed (passing subject)', async () => {
-    const result = await winCertAlreadyInstalled(url, certOptions)
+    const result = await winCertIsInstalled(url, certOptions)
     assert.strictEqual(result, false)
   })
 
@@ -109,7 +109,7 @@ describe('winCertAlreadyInstalled', () => {
     const pfxPath = await generateCertWithOpenSsl(url, certOptions)
     assert.ok(fileExistsAndIsNonZero(pfxPath))
 
-    const result = await winCertAlreadyInstalled({ pfxPath }, certOptions)
+    const result = await winCertIsInstalled({ pfxPath }, certOptions)
     assert.strictEqual(result, false)
   })
 
@@ -119,7 +119,7 @@ describe('winCertAlreadyInstalled', () => {
 
     await winInstallCert(pfxPath, certOptions)
 
-    const result = await winCertAlreadyInstalled(url, certOptions)
+    const result = await winCertIsInstalled(url, certOptions)
     assert.strictEqual(result, true)
 
     await winUninstallCert(url, certOptions)
@@ -131,7 +131,7 @@ describe('winCertAlreadyInstalled', () => {
 
     await winInstallCert(pfxPath, certOptions)
 
-    const result = await winCertAlreadyInstalled({ pfxPath }, certOptions)
+    const result = await winCertIsInstalled({ pfxPath }, certOptions)
     assert.strictEqual(result, true)
 
     await winUninstallCert(url, certOptions)
