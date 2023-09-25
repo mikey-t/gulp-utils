@@ -45,7 +45,7 @@ describe('generateCertWithOpenSsl', () => {
     }
 
     for (const ext of extensions) {
-      let expectedErrorPart = expectedErrorPartTemplate.replace('__ext__', ext)
+      const expectedErrorPart = expectedErrorPartTemplate.replace('__ext__', ext)
       await assert.rejects(
         async () => await generateCertWithOpenSsl(url, certOptions),
         err => {

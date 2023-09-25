@@ -6,6 +6,9 @@ import path, { resolve } from 'node:path'
 import * as readline from 'readline'
 import { config } from './NodeCliUtilsConfig.js'
 import { SpawnOptionsInternal, copyEnv, dictionaryToEnvFileString, getEnvAsDictionary, spawnAsyncInternal } from './generalUtilsInternal.js'
+
+// For JSDoc links
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { winInstallCert, winUninstallCert } from './certUtils.js'
 
 const dockerComposeCommandsThatSupportDetached = ['exec', 'logs', 'ps', 'restart', 'run', 'start', 'stop', 'up']

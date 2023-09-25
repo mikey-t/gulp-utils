@@ -5,7 +5,7 @@ import path, { join } from 'node:path'
 import { beforeEach, describe, it } from 'node:test'
 import { whichSync, WhichResult, mkdirp } from '../src/generalUtils.js'
 import { TarballUtility } from '../src/TarballUtility.js'
-import { ensureEmptyTmpDir, fileExistsAndIsNonZero, fixturesDir, only, tmpDir } from './testUtils.js'
+import { ensureEmptyTmpDir, fileExistsAndIsNonZero, fixturesDir, tmpDir } from './testUtils.js'
 import { config } from '../src/NodeCliUtilsConfig.js'
 
 config.traceEnabled = false
@@ -166,7 +166,7 @@ describe('unpackTarball', () => {
     assert.ok(unpackedTestDirContents.length === 0, `unpackedTestDir should be empty but it contains ${unpackedTestDirContents.length} files`)
   })
 
-  it('creates the directory if it does\'t exist if that option is passed', async t => {
+  it('creates the directory if it does\'t exist if that option is passed', async () => {
     await defaultTarballUtility.unpackTarball(fixtureTarball, unpackedTestDir, { createDirIfNotExists: true })
     assertDefaultTarballContents(true)
   })

@@ -1,4 +1,8 @@
-import { log, requireString, requireValidPath, spawnAsync, trace, whichSync, SpawnError } from './generalUtils.js'
+import { log, requireString, requireValidPath, spawnAsync, trace, whichSync } from './generalUtils.js'
+
+// For JSDoc link
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+import type { SpawnError } from './generalUtils.js'
 
 /**
  * Runs dotnet build on the specified project.

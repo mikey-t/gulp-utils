@@ -1,4 +1,6 @@
-*
-!*.ts
-!src/**/*.ts
-!test/**/*.ts
+.scannerwork
+.vscode
+dist
+docs
+node_modules
+playground

@@ -2,8 +2,9 @@ import { emptyDirectory, log, spawnAsync, spawnAsyncLongRunning } from './src/ge
 import { series, parallel } from 'swig-cli'
 import fsp from 'node:fs/promises'
 
-// Using direct paths to local tsc to skip the startup delay of using npm
+// Using direct paths to node_modules to skip the startup delay of using npm
 const tscPath = './node_modules/typescript/lib/tsc.js'
+const eslintPath = './node_modules/eslint/bin/eslint.js'
 const typedocPath = './node_modules/typedoc/dist/lib/cli.js'
 const baseTestArgs = ['--no-warnings', '--loader', 'tsx']
 const testFiles = [
@@ -17,6 +18,10 @@ const testFiles = [
 export const build = series(cleanDist, parallel(buildEsm, series(buildCjs, copyCjsPackageJson)))
 export const buildEsmOnly = series(cleanDist, buildEsm)
 export const buildCjsOnly = series(cleanDist, buildCjs)
+
+export async function lint() {
+  await spawnAsync('node', [eslintPath, '--ext', '.ts', './src', './test'], { throwOnNonZero: true })
+}
 
 export async function genDocs() {
   await spawnAsync('node', [typedocPath], { throwOnNonZero: true })
