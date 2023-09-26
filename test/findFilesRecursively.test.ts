@@ -114,7 +114,7 @@ describe('findFilesRecursively', () => {
   it('throws if pattern param is more than 50 characters', async () => {
     const pattern = 'a'.repeat(51)
     await assert.rejects(
-      async () => await findFilesRecursively(searchDir, pattern),
+      findFilesRecursively(searchDir, pattern),
       { name: 'Error', message: 'filenamePattern param must have fewer than 50 characters' }
     )
   })
@@ -122,7 +122,7 @@ describe('findFilesRecursively', () => {
   it('throws if there are more than 5 wildcard characters in pattern param', async () => {
     const pattern = 'a*'.repeat(6)
     await assert.rejects(
-      async () => await findFilesRecursively(searchDir, pattern),
+      findFilesRecursively(searchDir, pattern),
       { name: 'Error', message: 'filenamePattern param must contain 5 or fewer wildcards', }
     )
   })
@@ -146,14 +146,14 @@ describe('findFilesRecursively', () => {
 
   it('does not allow forward slashes in the filePattern param', async () => {
     await assert.rejects(
-      async () => await findFilesRecursively(searchDir, 'dirA/second-level*'),
+      findFilesRecursively(searchDir, 'dirA/second-level*'),
       { name: 'Error', message: 'filenamePattern param must not contain slashes', }
     )
   })
 
   it('does not allow back slashes in the filePattern param', async () => {
     await assert.rejects(
-      async () => await findFilesRecursively(searchDir, 'dirA\\second-level*'),
+      findFilesRecursively(searchDir, 'dirA\\second-level*'),
       { name: 'Error', message: 'filenamePattern param must not contain slashes', }
     )
   })

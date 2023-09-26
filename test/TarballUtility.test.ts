@@ -5,7 +5,7 @@ import path, { join } from 'node:path'
 import { beforeEach, describe, it } from 'node:test'
 import { whichSync, WhichResult, mkdirp, spawnAsync, SpawnResult } from '../src/generalUtils.js'
 import { TarballUtility } from '../src/TarballUtility.js'
-import { assertErrorMessageStartsWith, ensureEmptyTmpDir, fileExistsAndIsNonZero, fixturesDir, only, tmpDir } from './testUtils.js'
+import { assertErrorMessageStartsWith, ensureEmptyTmpDir, fileExistsAndIsNonZero, fixturesDir, tmpDir } from './testUtils.js'
 import { config } from '../src/NodeCliUtilsConfig.js'
 
 config.traceEnabled = false
@@ -63,7 +63,7 @@ describe('createTarball', () => {
   it('throws if directoryToTarball does not exist', async () => {
     const nonExistentDir = join(fixturesDir, 'nonExistentDir')
     await assert.rejects(
-      async () => { await defaultTarballUtility.createTarball(nonExistentDir, tarballPath) },
+      defaultTarballUtility.createTarball(nonExistentDir, tarballPath),
       { name: 'Error', message: `Invalid or nonexistent path provided for param 'directoryToTarball': ${nonExistentDir}` }
     )
   })
@@ -71,7 +71,7 @@ describe('createTarball', () => {
   it('throws if tarballPath does not end in .tar.gz', async () => {
     const invalidTarballPath = join(tarballTmpDir, 'invalid.tar')
     await assert.rejects(
-      async () => { await defaultTarballUtility.createTarball(dirToTarball, invalidTarballPath) },
+      defaultTarballUtility.createTarball(dirToTarball, invalidTarballPath),
       err => assertErrorMessageStartsWith(err, `tarballPath must end with '.tar.gz':`))
   })
 
@@ -80,7 +80,7 @@ describe('createTarball', () => {
     const whichSyncMock = t.mock.fn(whichSync, () => mockResult)
     const tarballUtility = new TarballUtility({ whichSyncFn: whichSyncMock })
     await assert.rejects(
-      async () => { await tarballUtility.createTarball(dirToTarball, tarballPath) },
+      tarballUtility.createTarball(dirToTarball, tarballPath),
       { name: 'Error', message: 'tar command not found - please install tar on your OS to use this method, or consider using the npm package node-tar instead' }
     )
   })
@@ -94,7 +94,7 @@ describe('createTarball', () => {
   it('throws if the tarball already exists', async () => {
     await defaultTarballUtility.createTarball(dirToTarball, tarballPath)
     await assert.rejects(
-      async () => { await defaultTarballUtility.createTarball(dirToTarball, tarballPath) },
+      defaultTarballUtility.createTarball(dirToTarball, tarballPath),
       err => assertErrorMessageStartsWith(err, 'tarballPath already exists - delete, move or rename it first:')
     )
   })
@@ -156,24 +156,24 @@ describe('createTarball', () => {
     const spawnAsyncMock = t.mock.fn(spawnAsync, async () => mockResult)
     const tarballUtility = new TarballUtility({ spawnAsyncFn: spawnAsyncMock })
     await assert.rejects(
-      async () => { await tarballUtility.createTarball(dirToTarball, tarballPath) },
+      tarballUtility.createTarball(dirToTarball, tarballPath),
       { name: 'Error', message: 'tar command failed with code 42' }
     )
   })
 })
 
-describe('unpackTarball', only, () => {
+describe('unpackTarball', () => {
   it('throws if tarballPath does not exist', async () => {
     const nonExistentTarballPath = join(fixturesDir, 'nonExistentTarball.tar.gz')
     await assert.rejects(
-      async () => { await defaultTarballUtility.unpackTarball(nonExistentTarballPath, unpackedTestDir) },
+      defaultTarballUtility.unpackTarball(nonExistentTarballPath, unpackedTestDir),
       { name: 'Error', message: `Invalid or nonexistent path provided for param 'tarballPath': ${nonExistentTarballPath}` }
     )
   })
 
   it('throws if stripComponents is less than 0', async () => {
     await assert.rejects(
-      async () => { await defaultTarballUtility.unpackTarball(fixtureTarball, unpackedTestDir, { stripComponents: -1 }) },
+      defaultTarballUtility.unpackTarball(fixtureTarball, unpackedTestDir, { stripComponents: -1 }),
       { name: 'Error', message: 'stripComponents must be greater than or equal to 0 if provided' }
     )
   })
@@ -193,7 +193,7 @@ describe('unpackTarball', only, () => {
   it('strips 2 directory off of tarball when unpacking with stripComponents of 2', async () => {
     await mkdirp(unpackedTestDir)
     await defaultTarballUtility.unpackTarball(fixtureTarball, unpackedTestDir, { stripComponents: 2 })
-    assert.ok(fs.existsSync(path.join(unpackedTestDir, 'test3.txt')), 'there should only be one file (test3.txt) in the unpacked directory')
+    assert.ok(fs.existsSync(path.join(unpackedTestDir, 'test3.txt')), 'there should be exactly one file (test3.txt) in the unpacked directory')
   })
 
   it('unpacked directory is empty if stripComponents is equal to the max depth of the directoryToTarball', async () => {
@@ -218,7 +218,7 @@ describe('unpackTarball', only, () => {
   it('throws if unpackDirectory does not exist and createDirIfNotExists option is false', async () => {
     await defaultTarballUtility.createTarball(dirToTarball, tarballPath)
     await assert.rejects(
-      async () => { await defaultTarballUtility.unpackTarball(tarballPath, unpackedTestDir) },
+      defaultTarballUtility.unpackTarball(tarballPath, unpackedTestDir),
       { name: 'Error', message: `unpackDirectory does not exist: ${unpackedTestDir}` }
     )
   })
@@ -228,7 +228,7 @@ describe('unpackTarball', only, () => {
     await mkdirp(unpackedTestDir)
     await fsp.writeFile(path.join(unpackedTestDir, 'dummy.txt'), 'dummy')
     await assert.rejects(
-      async () => { await defaultTarballUtility.unpackTarball(tarballPath, unpackedTestDir) },
+      defaultTarballUtility.unpackTarball(tarballPath, unpackedTestDir),
       { name: 'Error', message: `unpackDirectory exists but is not empty: ${unpackedTestDir}` }
     )
   })
@@ -237,7 +237,7 @@ describe('unpackTarball', only, () => {
     const dummyFilePath = path.join(tarballTmpDir, 'dummy.txt')
     await fsp.writeFile(dummyFilePath, 'dummy')
     await assert.rejects(
-      async () => { await defaultTarballUtility.unpackTarball(fixtureTarball, dummyFilePath) },
+      defaultTarballUtility.unpackTarball(fixtureTarball, dummyFilePath),
       { name: 'Error', message: `unpackDirectory exists but is not a directory: ${dummyFilePath}` }
     )
   })
@@ -250,7 +250,7 @@ describe('unpackTarball', only, () => {
     const tarballUtility = new TarballUtility({ statSyncFn: statSyncMock })
 
     await assert.rejects(
-      async () => { await tarballUtility.unpackTarball(fixtureTarball, unpackedTestDir, { stripComponents: 1 }) },
+      tarballUtility.unpackTarball(fixtureTarball, unpackedTestDir, { stripComponents: 1 }),
       err => assertErrorMessageStartsWith(err, 'unpackDirectory exists but is not a directory')
     )
   })
@@ -260,24 +260,24 @@ describe('unpackTarball', only, () => {
     await mkdirp(unpackedTestDir)
 
     const statSyncMock = t.mock.fn(fs.statSync)
-    // It gets called more than once, so only mock the error the second time
+    // It gets called more than once, so we're just mocking the error the second time
     statSyncMock.mock.mockImplementationOnce(() => { throw new Error('any error') }, 1)
     const tarballUtility = new TarballUtility({ statSyncFn: statSyncMock })
 
     await assert.rejects(
-      async () => { await tarballUtility.unpackTarball(tarballPath, unpackedTestDir) },
+      tarballUtility.unpackTarball(tarballPath, unpackedTestDir),
       { name: 'Error', message: 'Error checking dirIsNotEmpty - see innerError' }
     )
   })
 
-  it('throws if tryCreateDirectory throws', only, async t => {
+  it('throws if tryCreateDirectory throws', async t => {
     await defaultTarballUtility.createTarball(dirToTarball, tarballPath)
 
     const mkdirpMock = t.mock.fn(mkdirp, () => { throw new Error('Any error') })
     const tarballUtility = new TarballUtility({ mkdirpFn: mkdirpMock })
 
     await assert.rejects(
-      async () => { await tarballUtility.unpackTarball(tarballPath, unpackedTestDir, { createDirIfNotExists: true }) },
+      tarballUtility.unpackTarball(tarballPath, unpackedTestDir, { createDirIfNotExists: true }),
       { name: 'Error', message: 'Error creating unpackDirectory - see innerError' }
     )
   })
@@ -309,7 +309,7 @@ describe('unpackTarballContents', () => {
     const tarballUtility = new TarballUtility({ whichSyncFn: whichSyncMock })
 
     await assert.rejects(
-      async () => { await tarballUtility.unpackTarballContents(tarballPath, unpackedTestDir) },
+      tarballUtility.unpackTarballContents(tarballPath, unpackedTestDir),
       { name: 'Error', message: 'tar command not found - please install tar on your OS to use this method, or consider using the npm package node-tar instead' }
     )
   })
@@ -322,7 +322,7 @@ describe('unpackTarballContents', () => {
     const tarballUtility = new TarballUtility({ spawnAsyncFn: spawnAsyncMock })
 
     await assert.rejects(
-      async () => { await tarballUtility.unpackTarballContents(tarballPath, unpackedTestDir) },
+      tarballUtility.unpackTarballContents(tarballPath, unpackedTestDir),
       { name: 'Error', message: 'tar command failed with code 42' }
     )
   })
