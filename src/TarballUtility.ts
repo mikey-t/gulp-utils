@@ -1,6 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import { mkdirp, requireString, requireValidPath, spawnAsync, trace, whichSync } from './generalUtils.js'
+import { ExtendedError, mkdirp, requireString, requireValidPath, spawnAsync, trace, whichSync } from './generalUtils.js'
 import { config } from './NodeCliUtilsConfig.js'
 
 export interface CreateTarballOptions {
@@ -17,14 +17,27 @@ export interface TarballUnpackOptions {
   throwOnNonEmptyUnpackDir: boolean
 }
 
+export interface TarballUtilityDependencies {
+  whichSyncFn: typeof whichSync
+  spawnAsyncFn: typeof spawnAsync
+  statSyncFn: typeof fs.statSync
+  mkdirpFn: typeof mkdirp
+}
+
 /**
  * This utility class exists so we can mock the `which` dependency in unit tests without resorting to libraries that hack the import system.
  */
 export class TarballUtility {
   private whichSyncFn: typeof whichSync
+  private spawnAsyncFn: typeof spawnAsync
+  private statSyncFn: typeof fs.statSync
+  private mkdirpFn: typeof mkdirp
 
-  constructor(whichSyncFn: typeof whichSync) {
-    this.whichSyncFn = whichSyncFn
+  constructor(dependencies: Partial<TarballUtilityDependencies> = {}) {
+    this.whichSyncFn = dependencies.whichSyncFn || whichSync
+    this.spawnAsyncFn = dependencies.spawnAsyncFn || spawnAsync
+    this.statSyncFn = dependencies.statSyncFn || fs.statSync
+    this.mkdirpFn = dependencies.mkdirpFn || mkdirp
   }
 
   /**
@@ -59,7 +72,7 @@ export class TarballUtility {
 
     if (!fs.existsSync(outputDirectory)) {
       trace(`tarballPath directory does not exist - creating '${outputDirectory}'`)
-      await mkdirp(outputDirectory)
+      await this.mkdirpFn(outputDirectory)
     } else if (fs.existsSync(tarballPath)) {
       throw new Error(`tarballPath already exists - delete, move or rename it first: ${tarballPath}`)
     }
@@ -68,7 +81,7 @@ export class TarballUtility {
     const verboseFlag = config.traceEnabled ? ['-v'] : []
     const args = [...(verboseFlag), '-czf', tarballPath, '-C', directoryToTarballParentDir, ...excludesArgs, directoryToTarballName]
 
-    const result = await spawnAsync('tar', args)
+    const result = await this.spawnAsyncFn('tar', args)
 
     if (result.code !== 0) {
       throw new Error(`tar command failed with code ${result.code}`)
@@ -104,7 +117,7 @@ export class TarballUtility {
     if (unpackedDirExists && !this.isDirectory(unpackDirectory)) {
       throw new Error(`unpackDirectory exists but is not a directory: ${unpackDirectory}`)
     }
-
+    
     if (mergedOptions.createDirIfNotExists && !unpackedDirExists) {
       await this.tryCreateDirectory(unpackDirectory)
     }
@@ -119,7 +132,7 @@ export class TarballUtility {
 
     const verboseFlag = config.traceEnabled ? ['-v'] : []
     const args = [...(verboseFlag), '-xzf', tarballPath, '-C', unpackDirectory, '--strip-components', mergedOptions.stripComponents.toString()]
-    const result = await spawnAsync('tar', args)
+    const result = await this.spawnAsyncFn('tar', args)
 
     if (result.code !== 0) {
       throw new Error(`tar command failed with code ${result.code}`)
@@ -140,36 +153,33 @@ export class TarballUtility {
 
   private isDirectory = (path: string): boolean => {
     try {
-      const stats = fs.statSync(path)
+      const stats = this.statSyncFn(path)
       return stats.isDirectory()
     } catch (err) {
+      trace('error checking idDirectory (returning false)', err)
       return false
     }
   }
 
   private dirIsNotEmpty = (dirPath: string): boolean => {
     try {
-      const stats = fs.statSync(dirPath)
+      const stats = this.statSyncFn(dirPath)
       return stats.isDirectory() && fs.readdirSync(dirPath).length > 0
     } catch (err) {
-      return false
+      throw new ExtendedError('Error checking dirIsNotEmpty - see innerError', err as Error)
     }
   }
 
   private tryCreateDirectory = async (dirPath: string) => {
     try {
-      await mkdirp(dirPath)
+      await this.mkdirpFn(dirPath)
     } catch (err) {
-      if (err instanceof Error) {
-        throw new Error(`Error creating unpackDirectory: ${err.message}`)
-      } else {
-        throw new Error(`Error creating unpackDirectory: ${err}`)
-      }
+      throw new ExtendedError('Error creating unpackDirectory - see innerError', err as Error)
     }
   }
 }
 
-const defaultUtil = new TarballUtility(whichSync)
+const defaultUtil = new TarballUtility()
 
 export const createTarball = defaultUtil.createTarball
 export const unpackTarball = defaultUtil.unpackTarball
