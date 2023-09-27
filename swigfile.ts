@@ -13,7 +13,9 @@ const testFiles = [
   './test/generalUtils.test.ts',
   './test/findFilesRecursively.test.ts',
   './test/TarballUtility.test.ts',
-  // './test/certUtils.test.ts', // These only work on windows and are quite slow - uncomment this to run them only when making changes to certUtils.ts
+]
+const adminTestFiles = [
+  './test/certUtils.test.ts' // Note that these tests only currently work on windows and are quite slow
 ]
 
 export const build = series(cleanDist, parallel(buildEsm, series(buildCjs, copyCjsPackageJson)))
@@ -28,10 +30,14 @@ export async function genDocs() {
   await spawnAsync('node', [typedocPath], { throwOnNonZero: true })
 }
 
-export async function test() {
-  if ((await spawnAsync('node', [...loaderArgsTsx, '--test', ...testFiles])).code !== 0) {
+export async function test(additionalTestFiles: string[] = []) {
+  if ((await spawnAsync('node', [...loaderArgsTsx, '--test', ...testFiles, ...additionalTestFiles])).code !== 0) {
     throw new Error('Tests failed')
   }
+}
+
+export async function testAll() {
+  await test(adminTestFiles)
 }
 
 export async function testWatch() {
@@ -55,11 +61,22 @@ export async function testOnlyWatch() {
   }
 }
 
-export async function testCoverage() {
-  const args = [c8Path, 'node', ...loaderArgsTsNode, '--test', ...testFiles]
+export async function testCoverage(additionalTestFiles: string[] = []) {
+  const args = [c8Path, 'node', ...loaderArgsTsNode, '--test', ...testFiles, ...additionalTestFiles]
   if ((await spawnAsync('node', args, { env: { ...process.env, NODE_V8_COVERAGE: './coverage' } })).code !== 0) {
     throw new Error('Tests failed')
   }
+}
+
+export async function testCoverageOnly() {
+  const args = [c8Path, 'node', ...loaderArgsTsNode, '--test-only', '--test', ...testFiles, ...adminTestFiles]
+  if ((await spawnAsync('node', args, { env: { ...process.env, NODE_V8_COVERAGE: './coverage' } })).code !== 0) {
+    throw new Error('Tests failed')
+  }
+}
+
+export async function testCoverageAll() {
+  await testCoverage(adminTestFiles)
 }
 
 export async function cleanDist() {
@@ -70,6 +87,11 @@ const dockerComposePath = './docker/docker-compose.yml'
 
 export async function sonarUp() {
   await spawnDockerCompose(dockerComposePath, 'up', { useDockerComposeFileDirectoryAsCwd: true, args: ['sonarqube'] })
+  console.log('SonarQube server should be running at http://localhost:9000 (unless you changed the port in ./docker/.env)')
+}
+
+export async function sonarUpAttached() {
+  await spawnDockerCompose(dockerComposePath, 'up', { attached: true, useDockerComposeFileDirectoryAsCwd: true, args: ['sonarqube'] })
   console.log('SonarQube server should be running at http://localhost:9000 (unless you changed the port in ./docker/.env)')
 }
 

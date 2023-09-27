@@ -89,7 +89,13 @@ export async function spawnAsyncInternal(command: string, args?: string[], optio
       // Windows has an issue where child processes are orphaned when using the shell option. This workaround will spawn
       // a "middle" process using the shell option to check whether parent process is still running at intervals and if not, kill the child process tree.
       const workaroundCommand = 'node'
-      const workaroundScriptPath = path.join(moduleDir, spawnWorkaroundScriptName)
+      let workaroundScriptPath = path.join(moduleDir, spawnWorkaroundScriptName)
+
+      // This allows use of spawnAsyncLongRunning within this project (i.e. swigfile.ts)
+      if (!fs.existsSync(workaroundCommand) && workaroundScriptPath.includes('node-cli-utils')) {
+        workaroundScriptPath = path.resolve('dist/esm', spawnWorkaroundScriptName)
+      }
+
       // First check if this is the request for the workaround process itself
       if (options?.isLongRunning && isPlatformWindows() && command !== workaroundCommand && (!argsForChildProcess[0] || !argsForChildProcess[0].endsWith(spawnWorkaroundScriptName))) {
         trace(`${logPrefix}Running on Windows with shell option - using middle process hack to prevent orphaned processes`)
