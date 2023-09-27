@@ -1,6 +1,10 @@
 import { describe, it } from 'node:test'
-import { humanizeTime } from '../src/generalUtils.js'
+import { humanizeTime, requireString } from '../src/generalUtils.js'
 import assert from 'node:assert'
+import { assertErrorMessageEquals, only } from './testUtils.js'
+
+const testParamName = 'test'
+const expectedRequireStringError = `Required param '${testParamName}' is missing`
 
 describe('humanizeTime', () => {
   it('should return 0 ms for 0', () => {
@@ -26,5 +30,30 @@ describe('humanizeTime', () => {
   })
   it('should return 1.01 hours for 3660000', () => {
     assert.ok(['1.01 hours', '1.02 hours'].includes(humanizeTime(3660000)))
+  })
+})
+
+describe('requireString', only, () => {
+  it('does not throw if paramValue is a non-empty string', only, () => {
+    requireString(testParamName, 'non-empty')
+    assert.ok(true)
+  })
+  it('throws if paramValue is undefined', only, () => {
+    // @ts-ignore
+    assert.throws(() => requireString(testParamName, undefined), err => assertErrorMessageEquals(err, expectedRequireStringError))
+  })
+  it('throws if paramValue is null', only, () => {
+    // @ts-ignore
+    assert.throws(() => requireString(testParamName, null), err => assertErrorMessageEquals(err, expectedRequireStringError))
+  })
+  it('throws if paramValue is \'\'', only, () => {
+    assert.throws(() => requireString(testParamName, ''), err => assertErrorMessageEquals(err, expectedRequireStringError))
+  })
+  it('throws if paramValue is empty string of non-zero length', only, () => {
+    assert.throws(() => requireString(testParamName, '  '), err => assertErrorMessageEquals(err, expectedRequireStringError))
+  })
+  it('throws if paramValue is not a string', only, () => {
+    // @ts-ignore
+    assert.throws(() => requireString(testParamName, { someProp: 'some-val' }), err => assertErrorMessageEquals(err, expectedRequireStringError))
   })
 })

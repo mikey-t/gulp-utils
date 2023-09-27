@@ -28,12 +28,20 @@ export function fileExistsAndIsNonZero(filePath: string): boolean {
   }
 }
 
-export function assertErrorMessageStartsWith(err: unknown, startsWithString: string) {
-  assert.strictEqual(err instanceof Error && err.message.startsWith(startsWithString), true)
+export function assertErrorMessageStartsWith(err: unknown, expectedStartsWith: string) {
+  assert(err instanceof Error)
+  assert.strictEqual(err.message.startsWith(expectedStartsWith), true, 'Error message did not start with expected value')
   return true
 }
 
-export function assertErrorMessageIncludes(err: unknown, includesString: string) {
-  assert.strictEqual(err instanceof Error && err.message.includes(includesString), true)
+export function assertErrorMessageIncludes(err: unknown, expectedIncludes: string) {
+  assert(err instanceof Error)
+  assert.strictEqual(err.message.includes(expectedIncludes), true, 'Error message did not include the expected value')
+  return true
+}
+
+export function assertErrorMessageEquals(err: unknown, expected: string) {
+  assert(err instanceof Error)
+  assert.strictEqual(err.message, expected, 'Error message did not equal the expected value')
   return true
 }
