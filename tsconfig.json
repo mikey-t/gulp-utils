@@ -30,7 +30,8 @@
     "dist",
     "docs",
     "playground",
-    "node_modules"
+    "node_modules",
+    "docker"
   ],
   "ts-node": {
     "transpileOnly": true

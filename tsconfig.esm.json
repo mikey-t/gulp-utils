@@ -21,6 +21,7 @@
     "docs",
     "playground",
     "node_modules",
-    "test"
+    "test",
+    "docker"
   ]
 }

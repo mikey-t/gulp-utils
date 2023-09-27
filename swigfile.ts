@@ -1,4 +1,4 @@
-import { emptyDirectory, log, spawnAsync, spawnAsyncLongRunning } from './src/generalUtils.js'
+import { emptyDirectory, log, spawnAsync, spawnAsyncLongRunning, spawnDockerCompose } from './src/generalUtils.js'
 import { series, parallel } from 'swig-cli'
 import fsp from 'node:fs/promises'
 
@@ -66,6 +66,21 @@ export async function testCoverage() {
 
 export async function cleanDist() {
   await emptyDirectory('./dist')
+}
+
+const dockerComposePath = './docker/docker-compose.yml'
+
+export async function sonarUp() {
+  await spawnDockerCompose(dockerComposePath, 'up', { useDockerComposeFileDirectoryAsCwd: true, args: ['sonarqube'] })
+  console.log('SonarQube server should be running at http://localhost:9000')
+}
+
+export async function sonarDown() {
+  await spawnDockerCompose(dockerComposePath, 'down', { useDockerComposeFileDirectoryAsCwd: true, args: ['sonarqube'] })
+}
+
+export async function sonarScan() {
+  await spawnAsync('docker', ['compose', 'run', 'sonar-scanner'], { cwd: './docker' })
 }
 
 async function buildEsm() {
