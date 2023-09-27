@@ -8,14 +8,12 @@ const eslintPath = './node_modules/eslint/bin/eslint.js'
 const typedocPath = './node_modules/typedoc/dist/lib/cli.js'
 const c8Path = './node_modules/c8/bin/c8.js'
 const loaderArgsTsx = ['--no-warnings', '--loader', 'tsx']
-// const baseTestArgs = ['--loader', 'tsx']
 const loaderArgsTsNode = ['--no-warnings', '--loader', 'ts-node/esm']
 const testFiles = [
   './test/generalUtils.test.ts',
   './test/findFilesRecursively.test.ts',
   './test/TarballUtility.test.ts',
-  // These only work on windows and are quite slow - uncomment this to run them only when making changes to certUtils.ts
-  // './test/certUtils.test.ts', 
+  // './test/certUtils.test.ts', // These only work on windows and are quite slow - uncomment this to run them only when making changes to certUtils.ts
 ]
 
 export const build = series(cleanDist, parallel(buildEsm, series(buildCjs, copyCjsPackageJson)))
@@ -72,7 +70,7 @@ const dockerComposePath = './docker/docker-compose.yml'
 
 export async function sonarUp() {
   await spawnDockerCompose(dockerComposePath, 'up', { useDockerComposeFileDirectoryAsCwd: true, args: ['sonarqube'] })
-  console.log('SonarQube server should be running at http://localhost:9000')
+  console.log('SonarQube server should be running at http://localhost:9000 (unless you changed the port in ./docker/.env)')
 }
 
 export async function sonarDown() {
