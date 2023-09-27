@@ -1,6 +1,10 @@
+import 'dotenv/config'
 import { emptyDirectory, log, spawnAsync, spawnAsyncLongRunning, spawnDockerCompose } from './src/generalUtils.js'
 import { series, parallel } from 'swig-cli'
 import fsp from 'node:fs/promises'
+import { config } from './src/NodeCliUtilsConfig.js'
+
+config.traceEnabled = false
 
 // Using direct paths to node_modules to skip the startup delay of using npm
 const tscPath = './node_modules/typescript/lib/tsc.js'
@@ -17,6 +21,7 @@ const testFiles = [
 const adminTestFiles = [
   './test/certUtils.test.ts' // Note that these tests only currently work on windows and are quite slow
 ]
+const dockerComposePath = './docker-compose.yml'
 
 export const build = series(cleanDist, parallel(buildEsm, series(buildCjs, copyCjsPackageJson)))
 export const buildEsmOnly = series(cleanDist, buildEsm)
@@ -83,24 +88,22 @@ export async function cleanDist() {
   await emptyDirectory('./dist')
 }
 
-const dockerComposePath = './docker/docker-compose.yml'
-
-export async function sonarUp() {
-  await spawnDockerCompose(dockerComposePath, 'up', { useDockerComposeFileDirectoryAsCwd: true, args: ['sonarqube'] })
-  console.log('SonarQube server should be running at http://localhost:9000 (unless you changed the port in ./docker/.env)')
+export async function dockerUp() {
+  await printSonarQubeStartupMessage()
+  await spawnDockerCompose(dockerComposePath, 'up')
 }
 
-export async function sonarUpAttached() {
-  await spawnDockerCompose(dockerComposePath, 'up', { attached: true, useDockerComposeFileDirectoryAsCwd: true, args: ['sonarqube'] })
-  console.log('SonarQube server should be running at http://localhost:9000 (unless you changed the port in ./docker/.env)')
+export async function dockerUpAttached() {
+  await printSonarQubeStartupMessage()
+  await spawnDockerCompose(dockerComposePath, 'up', { attached: true })
 }
 
-export async function sonarDown() {
-  await spawnDockerCompose(dockerComposePath, 'down', { useDockerComposeFileDirectoryAsCwd: true, args: ['sonarqube'] })
+export async function dockerDown() {
+  await spawnDockerCompose(dockerComposePath, 'down')
 }
 
-export async function sonarScan() {
-  await spawnAsync('docker', ['compose', 'run', 'sonar-scanner'], { cwd: './docker' })
+export async function scan() {
+  await spawnDockerCompose(dockerComposePath, 'run', { args: ['sonar-scanner'], attached: true })
 }
 
 async function buildEsm() {
@@ -115,4 +118,8 @@ async function buildCjs() {
 
 async function copyCjsPackageJson() {
   await fsp.copyFile('./package.cjs.json', './dist/cjs/package.json')
+}
+
+async function printSonarQubeStartupMessage() {
+  console.log(`SonarQube url after it finishes initializing: http://localhost:${process.env.SONAR_PORT || 9000}`)
 }

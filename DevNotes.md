@@ -111,3 +111,33 @@ set trace enabled with:
 ```javascript
 config.traceEnabled = true
 ```
+
+## SonarQube Quality/Security Scanning
+
+Initial setup:
+
+- Copy `.env.template` to `.env`
+- Start SonarQube for the first time: `swig dockerUp`
+- Hit `http://localhost:9000` and wait for it to initialize
+- Login with `admin`/`admin` and change password when it prompts
+- Navigate to My Account -> Security and generate a new user token
+- Add new token to `SONAR_TOKEN` in `.env`
+
+Scan:
+
+- In admin terminal, run: `swig testCoverageAll`
+- Run: `swig dockerUp`
+- Run: `swig scan`
+- Evaluate results at http://localhost:9000
+- When done with SonarQube, bring it down by running: `swig dockerDown`
+
+Misc notes on SonarQube setup:
+
+- Docker compose notes:
+    - Syntax for using a default if not specified: `${SONAR_PORT:-9000}`
+    - Syntax for requiring a env var and throwing if not set: `${SONAR_TOKEN:?}`
+    - Unclear exactly what this does, but docs suggested setting the cache volume: `sonar_scanner_cache:/opt/sonar-scanner/.sonar/cache`
+    - Setting the cache volume required setting the user to `root` so it could read/write to/from the cache. This probably isn't optimal - will re-visit later.
+    - I wanted to define both services in a single docker compose so that the scanner can reference the server URL by docker service name, but I don't actually want both of them to run at the same time when running "docker compose up". Setting a profile on the scanner makes it so it doesn't start unless that profile flag is passed, or if the run command is called directly.
+- Scanner run time was incredibly slow (5 minutes) until I set the `sonar.working.directory` to a directory within the docker container and then it runs in a reasonable amount of time (26 seconds). The relevant docker-compose.yml entry: `command: sh -c "mkdir -p /tmp/sonar-scanner && sonar-scanner -Dsonar.working.directory=/tmp/sonar-scanner"`
+

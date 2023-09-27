@@ -306,18 +306,13 @@ export async function copyDirectoryContents(sourceDirectory: string, destination
 }
 
 /**
- * Helper method to validate that a non-falsy value is provided for a parameter that should be a string.
- * 
- * **Warning:** this does not validate the type of the parameter, just whether something non-empty was provided.
- * @param paramName The name of the parameter, for logging purposes
+ * Helper method to validate that a non-falsy and non-empty value is provided for a parameter that should be a string.
+ * @param paramName The name of the parameter to be used in the error message
  * @param paramValue The value of the parameter
  */
 export function requireString(paramName: string, paramValue: string) {
-  if (paramValue === undefined || paramValue === null || paramValue === '') {
+  if (paramValue === undefined || paramValue === null || paramValue === '' || typeof paramValue !== 'string' || paramValue.trim() === '') {
     throw new Error(`Required param '${paramName}' is missing`)
-  }
-  if (typeof paramValue !== 'string') {
-    throw new Error(`Required param '${paramName}' is not a string`)
   }
 }
 
@@ -335,75 +330,142 @@ export function requireValidPath(paramName: string, paramValue: string) {
 }
 
 /**
- * Options for the spawnDockerCompose wrapper function for `docker compose`.
- * @param args Additional arguments to pass to the docker-compose command
- * @param projectName Pass the same projectName for each commands for the same project to ensure your containers get unique, descriptive and consistent names.
+ * Project names must contain only lowercase letters, decimal digits, dashes, and underscores, and must begin with a lowercase letter or decimal digit.
+ * 
+ * See https://docs.docker.com/compose/environment-variables/envvars/#compose_project_name.
+ * @param projectName The string to validate
+ * @returns `true` if it's a valid docker compose project name and `false` otherwise
+ */
+export function isDockerComposeProjectNameValid(projectName: string): boolean {
+  requireString('projectName', projectName)
+
+  // Ensure first char is a lowercase letter or digit
+  if (!/^[a-z0-9]/.test(projectName[0])) {
+    return false
+  }
+
+  // Ensure the rest of the chars are only lowercase letters, digits, dashes and underscores
+  return /^[a-z0-9-_]+$/.test(projectName)
+}
+
+/**
+ * Options for {@link spawnDockerCompose}.
+ * @param projectName 
  * Note that there are other better options such as using the environment variable `COMPOSE_PROJECT_NAME`. See https://docs.docker.com/compose/environment-variables/envvars/#compose_project_name.
  * @param attached Default: false. All commands that support the detached option wil use it unless attached is specified as true (-d support: exec, logs, ps, restart, run, start, stop, up)
  * @param useDockerComposeFileDirectoryAsCwd Default: false. If true, the docker compose command will be run in the directory containing the docker compose file.
  */
 export interface DockerComposeOptions {
-  args?: string[]
+  /** Additional arguments to pass to the docker-compose command. */
+  args: string[]
+
+  /**
+   * Defaults to `false`. Controls whether or not the `--detach` option is passed. Note that this only applies to
+   * some commands (exec, logs, ps, restart, run, start, stop, up).
+   */
+  attached: boolean
+
+  /**
+  * If not provided, it will default to using the directory that the docker-compose.yml is located in.
+  * Specifies what current working directory to use with the spawn command.
+  */
+  cwd?: string
+
+  /**
+   * Optional. If provided, projectName will be passed as the `--project-name` param to `docker compose` so that generated containers will use it as a prefix
+   * instead of the default, which is the directory name where the docker-compose.yml is located.
+   * 
+   * Alternate approaches for setting the docker compose project name:
+   * 
+   * - Locate your docker-compose.yml file in the root of your project so that docker will use that directory name for prefixing generated containers
+   * - OR, locate your docker-compose.yml in a sub-directory named appropriately for use as a prefix for generated containers
+   * - OR, put a `.env` file in the same directory as your docker-compose.yml
+   * with the entry `COMPOSE_PROJECT_NAME=your-project-name`
+   * 
+   * Additional note on docker compose project names form the official docker compose docs: "Project names must contain only lowercase letters, decimal digits,
+   * dashes, and underscores, and must begin with a lowercase letter or decimal digit". See https://docs.docker.com/compose/environment-variables/envvars/#compose_project_name.
+   * 
+   */
   projectName?: string
-  attached?: boolean
-  useDockerComposeFileDirectoryAsCwd?: boolean
+
+  /**
+   * Optional. If provided, profile is passed to docker compose along with `--profile` param. Must match this regex: `[a-zA-Z0-9][a-zA-Z0-9_.-]+`.
+   * 
+   * See https://docs.docker.com/compose/profiles/.
+   */
+  profile?: string
 }
 
 /**
- * For docker compose commands, see https://docs.docker.com/compose/reference/.
+ * For docker compose commands, see https://docs.docker.com/compose/reference/. For available options for this wrapper function, see {@link DockerComposeOptions}.
+ * 
+ * The current working directory will be the directory of the {@link dockerComposePath} unless specified in the options. This ensures relative paths in the
+ * docker compose file will be relative to itself by default.
+ * 
+ * See {@link DockerComposeOptions.projectName} for info on where to locate your docker compose file and how to specify the docker project name.
  * @param dockerComposePath Path to docker-compose.yml
  * @param dockerComposeCommand The docker-compose command to run
  * @param options {@link DockerComposeOptions} to use, including additional arguments to pass to the docker compose command and the project name
  */
-export async function spawnDockerCompose(dockerComposePath: string, dockerComposeCommand: DockerComposeCommand, options?: DockerComposeOptions): Promise<void> {
+export async function spawnDockerCompose(dockerComposePath: string, dockerComposeCommand: DockerComposeCommand, options?: Partial<DockerComposeOptions>): Promise<void> {
   requireValidPath('dockerComposePath', dockerComposePath)
   requireString('dockerComposeCommand', dockerComposeCommand)
-
-  const useDockerComposeFileDirectoryAsCwd = options && options.useDockerComposeFileDirectoryAsCwd
-
-  if (await isDockerRunning() === false) {
+  if (options?.cwd) {
+    requireValidPath('cwd', options.cwd)
+  }
+  if (options?.projectName && !isDockerComposeProjectNameValid(options.projectName)) {
+    throw new Error('Invalid docker compose project name specified for the projectName param. Project names must contain only lowercase letters, decimal digits, dashes, and underscores, and must begin with a lowercase letter or decimal digit.')
+  }
+  if (options?.profile && !/[a-zA-Z0-9][a-zA-Z0-9_.-]+/.test(options.profile)) {
+    throw new Error('Invalid profile option - must match regex: [a-zA-Z0-9][a-zA-Z0-9_.-]+')
+  }
+  if (!await isDockerRunning()) {
     throw new Error('Docker is not running')
   }
 
-  const defaultOptions: DockerComposeOptions = { attached: false }
+  const defaultOptions: DockerComposeOptions = { args: [], attached: false, projectName: undefined, cwd: undefined }
   const mergedOptions = { ...defaultOptions, ...options }
 
   const dockerComposeDir = path.dirname(dockerComposePath)
   const dockerComposeFilename = path.basename(dockerComposePath)
 
-  const spawnCommand = 'docker'
-  let spawnArgs = ['compose', '-f', useDockerComposeFileDirectoryAsCwd ? dockerComposeFilename : dockerComposePath]
+  if (!mergedOptions.cwd) {
+    mergedOptions.cwd = dockerComposeDir
+  }
+
+  let spawnArgs = ['compose', '-f', mergedOptions.cwd ? path.resolve(dockerComposePath) : dockerComposeFilename]
 
   if (mergedOptions.projectName) {
     spawnArgs.push('--project-name', mergedOptions.projectName)
   }
 
+  if (mergedOptions.profile) {
+    spawnArgs.push('--profile', mergedOptions.profile)
+  }
+
   spawnArgs.push(dockerComposeCommand)
 
   if (!mergedOptions.attached && dockerComposeCommandsThatSupportDetached.includes(dockerComposeCommand)) {
-    spawnArgs.push('-d')
+    spawnArgs.push('--detach')
   }
 
   if (mergedOptions.args) {
     spawnArgs = spawnArgs.concat(mergedOptions.args)
   }
 
-  const dockerCommandString = `docker ${spawnArgs.join(' ')}`
-  const traceMessage = useDockerComposeFileDirectoryAsCwd ?
-    `running command in ${dockerComposeDir}: ${dockerCommandString}` :
-    `running command: ${dockerCommandString}`
-
-  trace(traceMessage)
+  trace(`running command in ${mergedOptions.cwd}: docker ${spawnArgs.join(' ')}`)
 
   const longRunning = dockerComposeCommandsThatSupportDetached.includes(dockerComposeCommand) && options && options.attached
 
+  trace(`docker compose command will be configured to use long running options: ${longRunning}`)
+
   const spawnOptions: SpawnOptionsInternal = {
-    cwd: useDockerComposeFileDirectoryAsCwd ? dockerComposeDir : process.cwd(),
-    shell: true,
+    cwd: mergedOptions.cwd,
+    shell: isPlatformWindows(), // Early termination with ctrl + C on windows will not be graceful unless the shell option is set to true
     isLongRunning: longRunning
   }
 
-  const spawnResult = await spawnAsyncInternal(spawnCommand, spawnArgs, spawnOptions)
+  const spawnResult = await spawnAsyncInternal('docker', spawnArgs, spawnOptions)
 
   if (spawnResult.code !== 0) {
     throw new Error(`docker compose command failed with code ${spawnResult.code}`)

@@ -1,0 +1,28 @@
+version: '3.9'
+services:
+  sonarqube:
+    image: sonarqube:10.2.1-community
+    ports:
+      - "${SONAR_PORT:-9000}:9000"
+    volumes:
+      - sonarqube_data:/opt/sonarqube/data
+      - sonarqube_logs:/opt/sonarqube/logs
+      - sonarqube_extensions:/opt/sonarqube/extensions
+
+  sonar-scanner:
+    image: sonarsource/sonar-scanner-cli
+    user: root
+    environment:
+      - SONAR_HOST_URL=http://sonarqube:${SONAR_PORT:-9000}
+      - SONAR_TOKEN=${SONAR_TOKEN:?}
+    volumes:
+      - .:/usr/src
+      - sonar_scanner_cache:/opt/sonar-scanner/.sonar/cache
+    profiles: [ "manual" ] # This prevents sonar-scanner from being started with "docker compose up"
+    command: sh -c "mkdir -p /tmp/sonar-scanner && sonar-scanner -Dsonar.working.directory=/tmp/sonar-scanner"
+
+volumes:
+  sonarqube_data:
+  sonarqube_logs:
+  sonarqube_extensions:
+  sonar_scanner_cache:
