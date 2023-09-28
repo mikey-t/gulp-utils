@@ -1,11 +1,11 @@
-import { SpawnOptions, spawnSync } from 'node:child_process'
+import { SpawnOptions } from 'node:child_process'
 import fs from 'node:fs'
 import fsp from 'node:fs/promises'
 import { platform } from 'node:os'
 import path, { resolve } from 'node:path'
 import * as readline from 'readline'
 import { config } from './NodeCliUtilsConfig.js'
-import { SpawnOptionsInternal, copyEnv, dictionaryToEnvFileString, getEnvAsDictionary, spawnAsyncInternal, validateFindFilesRecursivelyParams } from './generalUtilsInternal.js'
+import { SpawnOptionsInternal, copyEnv, dictionaryToEnvFileString, getEnvAsDictionary, simpleSpawnAsyncInternal, simpleSpawnSyncInternal, spawnAsyncInternal, validateFindFilesRecursivelyParams } from './generalUtilsInternal.js'
 
 // For JSDoc links
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -499,7 +499,8 @@ export function simpleCmdSync(command: string, args?: string[], throwOnNonZero: 
   if (!isPlatformWindows()) {
     throw new Error('getCmdResult is only supported on Windows')
   }
-  return simpleSpawnSync('cmd', ['/D', '/S', '/C', command, ...(args ?? [])], throwOnNonZero)
+  // Was previously spawning 'cmd' directly with params '/D', '/S', '/C' - but we may as well let NodeJS do the work of escaping args to work correctly with cmd
+  return simpleSpawnSyncInternal(command, args, throwOnNonZero, true)
 }
 
 /**
@@ -521,7 +522,8 @@ export async function simpleCmdAsync(command: string, args?: string[], throwOnNo
   if (!isPlatformWindows()) {
     throw new Error('getCmdResult is only supported on Windows')
   }
-  return await simpleSpawnAsync('cmd', ['/D', '/S', '/C', command, ...(args ?? [])], throwOnNonZero)
+  // Was previously spawning 'cmd' directly with params '/D', '/S', '/C' - but we may as well let NodeJS do the work of escaping args to work correctly with cmd
+  return await simpleSpawnAsyncInternal(command, args, throwOnNonZero, true)
 }
 
 /**
@@ -540,23 +542,7 @@ export async function simpleCmdAsync(command: string, args?: string[], throwOnNo
  * @throws {@link SimpleSpawnError} if the command fails and throwOnNonZero is true
  */
 export function simpleSpawnSync(command: string, args?: string[], throwOnNonZero: boolean = true): SimpleSpawnResult {
-  requireString('command', command)
-  const result = spawnSync(command, args ?? [], { encoding: 'utf-8' })
-
-  const spawnResult: SimpleSpawnResult = {
-    code: result.status ?? 1,
-    stdout: result.stdout.toString(),
-    stderr: result.stdout.toString(),
-    stdoutLines: stringToNonEmptyLines(result.stdout.toString()),
-    error: result.error,
-    cwd: process.cwd()
-  }
-
-  if (spawnResult.code !== 0 && throwOnNonZero) {
-    throw new SimpleSpawnError(`spawned process failed with code ${spawnResult.code}`, spawnResult)
-  }
-
-  return spawnResult
+  return simpleSpawnSyncInternal(command, args, throwOnNonZero)
 }
 
 /**
@@ -575,24 +561,7 @@ export function simpleSpawnSync(command: string, args?: string[], throwOnNonZero
  * @throws {@link SimpleSpawnError} if the command fails and throwOnNonZero is true
  */
 export async function simpleSpawnAsync(command: string, args?: string[], throwOnNonZero: boolean = true): Promise<SimpleSpawnResult> {
-  requireString('command', command)
-
-  const result = await spawnAsync(command, args, { stdio: 'pipe' })
-
-  const spawnResult: SimpleSpawnResult = {
-    code: result.code,
-    stdout: result.stdout,
-    stderr: result.stdout,
-    stdoutLines: stringToNonEmptyLines(result.stdout),
-    error: result.error,
-    cwd: process.cwd()
-  }
-
-  if (spawnResult.code !== 0 && throwOnNonZero) {
-    throw new SimpleSpawnError(`spawned process failed with code ${spawnResult.code}`, spawnResult)
-  }
-
-  return spawnResult
+  return await simpleSpawnAsyncInternal(command, args, throwOnNonZero)
 }
 
 /**

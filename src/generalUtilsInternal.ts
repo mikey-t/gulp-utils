@@ -1,9 +1,9 @@
-import { ChildProcess, spawn } from 'node:child_process'
+import { ChildProcess, spawn, spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import fsp from 'node:fs/promises'
 import path from 'node:path'
 import { config } from './NodeCliUtilsConfig.js'
-import { SpawnError, SpawnOptionsWithThrow, SpawnResult, StringKeyedDictionary, isPlatformWindows, log, requireString, requireValidPath, sortDictionaryByKeyAsc, spawnAsync, stringToNonEmptyLines, trace } from './generalUtils.js'
+import { SimpleSpawnError, SimpleSpawnResult, SpawnError, SpawnOptionsWithThrow, SpawnResult, StringKeyedDictionary, isPlatformWindows, log, requireString, requireValidPath, sortDictionaryByKeyAsc, spawnAsync, stringToNonEmptyLines, trace } from './generalUtils.js'
 
 const isCommonJS = typeof require === "function" && typeof module === "object" && module.exports
 const isEsm = !isCommonJS
@@ -253,4 +253,46 @@ export function validateFindFilesRecursivelyParams(dir: string, filenamePattern:
   if (filenamePattern.includes('/') || filenamePattern.includes('\\')) {
     throw new Error('filenamePattern param must not contain slashes')
   }
+}
+
+export function simpleSpawnSyncInternal(command: string, args?: string[], throwOnNonZero: boolean = true, useCmd: boolean = false): SimpleSpawnResult {
+  requireString('command', command)
+
+  const result = spawnSync(command, args ?? [], { encoding: 'utf-8', shell: useCmd ? 'cmd.exe' : false })
+
+  const spawnResult: SimpleSpawnResult = {
+    code: result.status ?? 1,
+    stdout: result.stdout.toString(),
+    stderr: result.stdout.toString(),
+    stdoutLines: stringToNonEmptyLines(result.stdout.toString()),
+    error: result.error,
+    cwd: process.cwd()
+  }
+
+  if (spawnResult.code !== 0 && throwOnNonZero) {
+    throw new SimpleSpawnError(`spawned process failed with code ${spawnResult.code}`, spawnResult)
+  }
+
+  return spawnResult
+}
+
+export async function simpleSpawnAsyncInternal(command: string, args?: string[], throwOnNonZero: boolean = true, useCmd: boolean = false): Promise<SimpleSpawnResult> {
+  requireString('command', command)
+
+  const result = await spawnAsync(command, args, { stdio: 'pipe', shell: useCmd ? 'cmd.exe' : false })
+
+  const spawnResult: SimpleSpawnResult = {
+    code: result.code,
+    stdout: result.stdout,
+    stderr: result.stdout,
+    stdoutLines: stringToNonEmptyLines(result.stdout),
+    error: result.error,
+    cwd: process.cwd()
+  }
+
+  if (spawnResult.code !== 0 && throwOnNonZero) {
+    throw new SimpleSpawnError(`spawned process failed with code ${spawnResult.code}`, spawnResult)
+  }
+
+  return spawnResult
 }

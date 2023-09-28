@@ -1,6 +1,6 @@
 // runWhileParentAlive.ts
 // Also referred to as "orphan protection" or "long running windows process workaround script"
-import { spawn, execSync, spawnSync } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import { config } from './NodeCliUtilsConfig.js'
 
@@ -48,7 +48,7 @@ function traceAndLog(message: string, isDevTrace = false) {
 
 function isParentProcessAlive(parentId: number) {
   try {
-    const result = spawnSync('tasklist', { shell: true })
+    const result = spawnSync('C:\\Windows\\system32\\tasklist.exe')
     const resultToLog = {
       status: result.status,
       stderr: result.stderr?.toString(),
@@ -70,7 +70,7 @@ function isParentProcessAlive(parentId: number) {
 
 function killTree(pid: number) {
   try {
-    execSync(`taskkill /pid ${pid} /T /F`)
+    spawnSync(`C:\\Windows\\system32\\taskkill.exe /pid ${pid} /T /F`)
     traceAndLog(`No errors running killTree`)
   } catch (err) {
     traceAndLog(`Error running taskkill with PID ${pid}: ${err instanceof Error ? err.toString() : err}`)
@@ -111,7 +111,8 @@ try {
 
   const [command, ...args] = passthroughArgs
 
-  const child = spawn(command, args, { stdio: 'inherit', shell: true })
+  const child = spawn(command, args, { stdio: 'inherit', shell: 'cmd.exe' })
+
   const childId = child.pid
   if (!childId) {
     const noChildIdMessage = 'spawning ChildProcess failed - no pid on returned handle'
