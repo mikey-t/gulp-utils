@@ -29,7 +29,9 @@ export async function dotnetPublish(projectPath: string = './', configuration: s
     requireValidPath('cwd', cwd)
   }
   const args = ['publish', projectPath, '-c', configuration, '-o', outputDir]
-  trace(`running dotnet ${args.join(' ')}${cwd ? ` in cwd ${cwd}` : ''}`)
+  const traceMessage = `running dotnet ${args.join(' ')}`
+  const traceAdditional = cwd ? ` in cwd ${cwd}` : ''
+  trace(`${traceMessage}${traceAdditional}`)
   await spawnAsync('dotnet', args, { cwd: cwd })
 }
 

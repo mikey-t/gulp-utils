@@ -142,7 +142,7 @@ export async function sleep(ms: number): Promise<void> {
  * An extension of the built-in SpawnOptions with an extra option to specify whether a non-zero exit code should throw an error.
  */
 export interface SpawnOptionsWithThrow extends SpawnOptions {
-  throwOnNonZero?: boolean
+  throwOnNonZero: boolean
   simpleErrorMsg?: string
 }
 
@@ -162,7 +162,7 @@ export interface SpawnOptionsWithThrow extends SpawnOptions {
  * @param options The options to pass to the command
  * @returns A Promise that resolves to a {@link SpawnResult}
  */
-export async function spawnAsync(command: string, args?: string[], options?: SpawnOptionsWithThrow): Promise<SpawnResult> {
+export async function spawnAsync(command: string, args?: string[], options?: Partial<SpawnOptionsWithThrow>): Promise<SpawnResult> {
   return spawnAsyncInternal(command, args, options)
 }
 
@@ -187,10 +187,7 @@ export async function spawnAsyncLongRunning(command: string, args?: string[], cw
  * @param dir The directory to ensure exists. If it does not exist, it will be created.
  */
 export async function ensureDirectory(dir: string) {
-  requireString('dir', dir)
-  if (!fs.existsSync(dir)) {
-    await mkdirp(dir)
-  }
+  return await mkdirp(dir)
 }
 
 /**
@@ -198,6 +195,7 @@ export async function ensureDirectory(dir: string) {
  * @param dir The directory to create. 
  */
 export async function mkdirp(dir: string) {
+  requireString('dir', dir)
   await fsp.mkdir(dir, { recursive: true })
 }
 
@@ -455,11 +453,11 @@ export async function spawnDockerCompose(dockerComposePath: string, dockerCompos
 
   trace(`running command in ${mergedOptions.cwd}: docker ${spawnArgs.join(' ')}`)
 
-  const longRunning = dockerComposeCommandsThatSupportDetached.includes(dockerComposeCommand) && options && options.attached
+  const longRunning = dockerComposeCommandsThatSupportDetached.includes(dockerComposeCommand) && options?.attached === true
 
   trace(`docker compose command will be configured to use long running options: ${longRunning}`)
 
-  const spawnOptions: SpawnOptionsInternal = {
+  const spawnOptions: Partial<SpawnOptionsInternal> = {
     cwd: mergedOptions.cwd,
     shell: isPlatformWindows(), // Early termination with ctrl + C on windows will not be graceful unless the shell option is set to true
     isLongRunning: longRunning
@@ -780,9 +778,9 @@ export async function deleteEnvIfExists(envPath: string) {
 
 
 export interface FindFilesOptions {
-  maxDepth?: number
-  excludeDirectoryNames?: string[],
-  returnForwardSlashRelativePaths?: boolean
+  maxDepth: number
+  excludeDirectoryNames: string[],
+  returnForwardSlashRelativePaths: boolean
 }
 
 /**
@@ -793,7 +791,7 @@ export interface FindFilesOptions {
  * @param options Specify a max depth to search, defaults to 5
  * @returns A Promise that resolves to an array of file paths that match the pattern
  */
-export async function findFilesRecursively(dir: string, filenamePattern: string, options?: FindFilesOptions): Promise<string[]> {
+export async function findFilesRecursively(dir: string, filenamePattern: string, options?: Partial<FindFilesOptions>): Promise<string[]> {
   requireValidPath('dir', dir)
   requireString('pattern', filenamePattern)
 
@@ -810,7 +808,7 @@ export async function findFilesRecursively(dir: string, filenamePattern: string,
     throw new Error('filenamePattern param must not contain slashes')
   }
 
-  const defaultOptions: FindFilesOptions = { maxDepth: 5 }
+  const defaultOptions: FindFilesOptions = { maxDepth: 5, excludeDirectoryNames: [], returnForwardSlashRelativePaths: false }
   const mergedOptions = { ...defaultOptions, ...options }
 
   // Convert the pattern to a regex
@@ -820,7 +818,7 @@ export async function findFilesRecursively(dir: string, filenamePattern: string,
 
   // Recursive function to search within directories
   async function searchDirectory(directory: string, depth: number): Promise<void> {
-    if (depth > mergedOptions.maxDepth!) return
+    if (depth > mergedOptions.maxDepth) return
 
     const entries = await fsp.readdir(directory, { withFileTypes: true })
 

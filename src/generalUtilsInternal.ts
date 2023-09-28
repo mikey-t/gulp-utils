@@ -68,10 +68,10 @@ export function dictionaryToEnvFileString(dict: StringKeyedDictionary): string {
 }
 
 export interface SpawnOptionsInternal extends SpawnOptionsWithThrow {
-  isLongRunning?: boolean
+  isLongRunning: boolean
 }
 
-export async function spawnAsyncInternal(command: string, args?: string[], options?: SpawnOptionsInternal): Promise<SpawnResult> {
+export async function spawnAsyncInternal(command: string, args?: string[], options?: Partial<SpawnOptionsInternal>): Promise<SpawnResult> {
   const moduleDir = await getCurrentModuleDir()
   return new Promise((resolve, reject) => {
     try {
@@ -182,7 +182,7 @@ export async function spawnAsyncInternal(command: string, args?: string[], optio
   })
 }
 
-function getSpawnError(code: number, result: SpawnResult, options: SpawnOptionsInternal): SpawnError {
+function getSpawnError(code: number, result: SpawnResult, options: Partial<SpawnOptionsInternal>): SpawnError {
   const additional = options.throwOnNonZero && options.stdio === 'inherit' ? `. See above for more details (stdio is 'inherit').` : ''
   return new SpawnError(`Spawning child process failed with code ${code}${additional}`, result)
 }

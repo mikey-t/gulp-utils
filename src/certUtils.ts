@@ -61,7 +61,7 @@ export async function generateCertWithOpenSsl(url: string, options?: Partial<Gen
 
   const mergedOptions: GenerateCertOptions = { ...defaultCertLogOptions, outputDirectory: './cert', ...options }
 
-  const spawnArgs: SpawnOptionsWithThrow = { cwd: mergedOptions.outputDirectory, stdio: mergedOptions.logSpawnOutput ? 'inherit' : 'pipe' }
+  const spawnArgs: Partial<SpawnOptionsWithThrow> = { cwd: mergedOptions.outputDirectory, stdio: mergedOptions.logSpawnOutput ? 'inherit' : 'pipe' }
 
   logIf(mergedOptions.logTraceMessages, 'checking if openssl is installed')
 
