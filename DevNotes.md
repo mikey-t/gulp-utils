@@ -116,6 +116,14 @@ config.traceEnabled = true
 
 Initial setup:
 
+- If on windows 10 and WSL 2
+    - Ensure `%USERPROFILE%/.wslconfig` has these lines:
+    ```
+    [wsl2]
+    kernelCommandLine = "sysctl.vm.max_map_count=262144"
+    ```
+    - Restart WSL (shutdown with `wsl.exe shutdown`, wait 10 seconds, then open an ubuntu shell to trigger startup)
+    - Start docker again if it isn't set to start automatically
 - Copy `.env.template` to `.env`
 - Start SonarQube for the first time: `swig dockerUp`
 - Hit `http://localhost:9000` and wait for it to initialize

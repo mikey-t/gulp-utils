@@ -106,6 +106,10 @@ export async function scan() {
   await spawnDockerCompose(dockerComposePath, 'run', { args: ['sonar-scanner'], attached: true })
 }
 
+export async function bashIntoSonar() {
+  await spawnDockerCompose(dockerComposePath, 'exec', { args: ['-it', 'sonarqube', 'bash'], attached: true })
+}
+
 async function buildEsm() {
   log('Building ESM')
   await spawnAsync('node', [tscPath, '--p', 'tsconfig.esm.json'], { throwOnNonZero: true })
