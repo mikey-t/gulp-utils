@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test'
 import { humanizeTime, requireString } from '../src/generalUtils.js'
 import assert from 'node:assert'
-import { assertErrorMessageEquals, only } from './testUtils.js'
+import { assertErrorMessageEquals } from './testUtils.js'
 
 const testParamName = 'test'
 const expectedRequireStringError = `Required param '${testParamName}' is missing`
@@ -33,26 +33,26 @@ describe('humanizeTime', () => {
   })
 })
 
-describe('requireString', only, () => {
-  it('does not throw if paramValue is a non-empty string', only, () => {
+describe('requireString', () => {
+  it('does not throw if paramValue is a non-empty string', () => {
     requireString(testParamName, 'non-empty')
     assert.ok(true)
   })
-  it('throws if paramValue is undefined', only, () => {
+  it('throws if paramValue is undefined', () => {
     // @ts-ignore
     assert.throws(() => requireString(testParamName, undefined), err => assertErrorMessageEquals(err, expectedRequireStringError))
   })
-  it('throws if paramValue is null', only, () => {
+  it('throws if paramValue is null', () => {
     // @ts-ignore
     assert.throws(() => requireString(testParamName, null), err => assertErrorMessageEquals(err, expectedRequireStringError))
   })
-  it('throws if paramValue is \'\'', only, () => {
+  it('throws if paramValue is \'\'', () => {
     assert.throws(() => requireString(testParamName, ''), err => assertErrorMessageEquals(err, expectedRequireStringError))
   })
-  it('throws if paramValue is empty string of non-zero length', only, () => {
+  it('throws if paramValue is empty string of non-zero length', () => {
     assert.throws(() => requireString(testParamName, '  '), err => assertErrorMessageEquals(err, expectedRequireStringError))
   })
-  it('throws if paramValue is not a string', only, () => {
+  it('throws if paramValue is not a string', () => {
     // @ts-ignore
     assert.throws(() => requireString(testParamName, { someProp: 'some-val' }), err => assertErrorMessageEquals(err, expectedRequireStringError))
   })

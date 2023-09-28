@@ -1,11 +1,11 @@
-import { SpawnOptions, exec, spawnSync } from 'node:child_process'
+import { SpawnOptions, spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import fsp from 'node:fs/promises'
 import { platform } from 'node:os'
 import path, { resolve } from 'node:path'
 import * as readline from 'readline'
 import { config } from './NodeCliUtilsConfig.js'
-import { SpawnOptionsInternal, copyEnv, dictionaryToEnvFileString, getEnvAsDictionary, spawnAsyncInternal } from './generalUtilsInternal.js'
+import { SpawnOptionsInternal, copyEnv, dictionaryToEnvFileString, getEnvAsDictionary, spawnAsyncInternal, validateFindFilesRecursivelyParams } from './generalUtilsInternal.js'
 
 // For JSDoc links
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -163,7 +163,7 @@ export interface SpawnOptionsWithThrow extends SpawnOptions {
  * @returns A Promise that resolves to a {@link SpawnResult}
  */
 export async function spawnAsync(command: string, args?: string[], options?: Partial<SpawnOptionsWithThrow>): Promise<SpawnResult> {
-  return spawnAsyncInternal(command, args, options)
+  return spawnAsyncInternal(command, args ?? [], options)
 }
 
 /**
@@ -179,7 +179,7 @@ export async function spawnAsync(command: string, args?: string[], options?: Par
  * @returns A Promise that resolves to a {@link SpawnResult}
  */
 export async function spawnAsyncLongRunning(command: string, args?: string[], cwd?: string): Promise<SpawnResult> {
-  return spawnAsyncInternal(command, args, { cwd: cwd, isLongRunning: true })
+  return spawnAsyncInternal(command, args ?? [], { cwd: cwd, isLongRunning: true })
 }
 
 /**
@@ -239,7 +239,7 @@ export async function emptyDirectory(directoryToEmpty: string, fileAndDirectoryN
   let dirEntry = await dir.read()
 
   while (dirEntry) {
-    if (fileAndDirectoryNamesToSkip && fileAndDirectoryNamesToSkip.includes(dirEntry.name)) {
+    if (fileAndDirectoryNamesToSkip?.includes(dirEntry.name)) {
       dirEntry = await dir.read()
       continue
     }
@@ -477,7 +477,7 @@ export async function spawnDockerCompose(dockerComposePath: string, dockerCompos
  */
 export function stringToNonEmptyLines(str: string): string[] {
   if (!str) { return [] }
-  return str.split('\n').filter(line => line && line.trim()).map(line => line.replace('\r', ''))
+  return str.split('\n').filter(line => line?.trim()).map(line => line.replace('\r', ''))
 }
 
 /**
@@ -500,6 +500,28 @@ export function simpleCmdSync(command: string, args?: string[], throwOnNonZero: 
     throw new Error('getCmdResult is only supported on Windows')
   }
   return simpleSpawnSync('cmd', ['/D', '/S', '/C', command, ...(args ?? [])], throwOnNonZero)
+}
+
+/**
+ * Runs the requested command using {@link spawnAsync} wrapped in an outer Windows CMD.exe command and returns the result with stdout split into lines.
+ * 
+ * Use this for simple quick commands that don't require a lot of control.
+ * 
+ * For commands that aren't Windows and CMD specific, use {@link simpleSpawnAsync}.
+ * 
+ * **Warning:** Do NOT use this for generating commands dynamically from user input as it could be used to execute arbitrary code.
+ * This is meant solely for building up known commands that are not made up of unsanitized user input, and only at compile time.
+ * See {@link winInstallCert} and {@link winUninstallCert} for examples of taking user input and inserting it safely into known commands.
+ * @param command Command to run
+ * @param args Arguments to pass to the command
+ * @returns An object with the status code, stdout, stderr, and error (if any)
+ * @throws {@link SimpleSpawnError} if the command fails and throwOnNonZero is true
+ */
+export async function simpleCmdAsync(command: string, args?: string[], throwOnNonZero: boolean = true): Promise<SimpleSpawnResult> {
+  if (!isPlatformWindows()) {
+    throw new Error('getCmdResult is only supported on Windows')
+  }
+  return await simpleSpawnAsync('cmd', ['/D', '/S', '/C', command, ...(args ?? [])], throwOnNonZero)
 }
 
 /**
@@ -526,6 +548,42 @@ export function simpleSpawnSync(command: string, args?: string[], throwOnNonZero
     stdout: result.stdout.toString(),
     stderr: result.stdout.toString(),
     stdoutLines: stringToNonEmptyLines(result.stdout.toString()),
+    error: result.error,
+    cwd: process.cwd()
+  }
+
+  if (spawnResult.code !== 0 && throwOnNonZero) {
+    throw new SimpleSpawnError(`spawned process failed with code ${spawnResult.code}`, spawnResult)
+  }
+
+  return spawnResult
+}
+
+/**
+ * Runs the requested command using {@link spawnAsync} and returns the result with stdout split into lines.
+ * 
+ * Use this for simple quick commands that don't require a lot of control.
+ * 
+ * For commands that are Windows and CMD specific, use {@link simpleCmdSync}.
+ * 
+ * **Warning:** Do NOT use this for generating commands dynamically from user input as it could be used to execute arbitrary code.
+ * This is meant solely for building up known commands that are not made up of unsanitized user input, and only at compile time.
+ * See {@link winInstallCert} and {@link winUninstallCert} for examples of taking user input and inserting it safely into known commands.
+ * @param command Command to run
+ * @param args Arguments to pass to the command
+ * @returns An object with the status code, stdout, stderr, and error (if any)
+ * @throws {@link SimpleSpawnError} if the command fails and throwOnNonZero is true
+ */
+export async function simpleSpawnAsync(command: string, args?: string[], throwOnNonZero: boolean = true): Promise<SimpleSpawnResult> {
+  requireString('command', command)
+
+  const result = await spawnAsync(command, args, { stdio: 'pipe' })
+
+  const spawnResult: SimpleSpawnResult = {
+    code: result.code,
+    stdout: result.stdout,
+    stderr: result.stdout,
+    stdoutLines: stringToNonEmptyLines(result.stdout),
     error: result.error,
     cwd: process.cwd()
   }
@@ -585,9 +643,32 @@ export function whichSync(commandName: string): WhichResult {
 }
 
 /**
- * First checks if docker is installed and if not immediately returns false.
- * 
- * Then runs the `docker info` command and looks for "error during connect" in the output to determine if docker is running.
+ * This is a cross-platform method to get the location of a system command. Useful for checking if software
+ * is installed, where it's installed and whether there are multiple locations for a command.
+ * @param commandName The name of the command to find
+ * @returns The location of the command, any additional locations, and an error if one occurred
+ */
+export async function whichAsync(commandName: string): Promise<WhichResult> {
+  if (isPlatformWindows()) {
+    const result = await simpleCmdAsync('where', [commandName])
+    return {
+      location: result.stdoutLines[0],
+      additionalLocations: result.stdoutLines.slice(1),
+      error: result.error
+    }
+  } else {
+    const result = await simpleSpawnAsync('which', ['-a', commandName])
+    return {
+      location: result.stdoutLines[0],
+      additionalLocations: result.stdoutLines.slice(1),
+      error: result.error
+    }
+  }
+}
+
+/**
+ * First checks if docker is installed and if not immediately returns false. Then runs the `docker info`
+ * command and looks for "error during connect" in the output to determine if docker is running.
  * @returns `true` if docker is installed and running, `false` otherwise
  */
 export async function isDockerRunning(): Promise<boolean> {
@@ -595,19 +676,13 @@ export async function isDockerRunning(): Promise<boolean> {
     trace('whichSync will not check if docker is running because docker does not appear to be installed - returning false')
     return false
   }
-  return new Promise((resolve) => {
-    exec('docker info', (error, stdout) => {
-      if (error) {
-        resolve(false)
-      } else {
-        if (!stdout || stdout.includes('error during connect')) {
-          resolve(false)
-        } else {
-          resolve(true)
-        }
-      }
-    })
-  })
+
+  try {
+    const result = await simpleSpawnAsync('docker', ['info'])
+    return !result.stdout.includes('error during connect')
+  } catch (err) {
+    return false
+  }
 }
 
 /**
@@ -792,21 +867,7 @@ export interface FindFilesOptions {
  * @returns A Promise that resolves to an array of file paths that match the pattern
  */
 export async function findFilesRecursively(dir: string, filenamePattern: string, options?: Partial<FindFilesOptions>): Promise<string[]> {
-  requireValidPath('dir', dir)
-  requireString('pattern', filenamePattern)
-
-  if (filenamePattern.length > 50) {
-    throw new Error(`filenamePattern param must have fewer than 50 characters`)
-  }
-
-  const numWildcards = filenamePattern.replace(/\*+/g, '*').split('*').length - 1
-  if (numWildcards > 5) {
-    throw new Error(`filenamePattern param must contain 5 or fewer wildcards`)
-  }
-
-  if (filenamePattern.includes('/') || filenamePattern.includes('\\')) {
-    throw new Error('filenamePattern param must not contain slashes')
-  }
+  validateFindFilesRecursivelyParams(dir, filenamePattern)
 
   const defaultOptions: FindFilesOptions = { maxDepth: 5, excludeDirectoryNames: [], returnForwardSlashRelativePaths: false }
   const mergedOptions = { ...defaultOptions, ...options }
@@ -827,7 +888,7 @@ export async function findFilesRecursively(dir: string, filenamePattern: string,
 
       if (entry.isDirectory()) {
         // Check if directory is in the exclude list
-        if (!mergedOptions.excludeDirectoryNames || !mergedOptions.excludeDirectoryNames.includes(entry.name)) {
+        if (!mergedOptions.excludeDirectoryNames?.includes(entry.name)) {
           await searchDirectory(fullPath, depth + 1)
         }
       } else if (entry.isFile() && regex.test(entry.name)) {
@@ -943,7 +1004,7 @@ export class ExtendedError extends Error {
 
   constructor(message: string, innerError?: Error) {
     super(message)
-    this.innerError = innerError || null
+    this.innerError = innerError ?? null
     Object.setPrototypeOf(this, ExtendedError.prototype)
   }
 }

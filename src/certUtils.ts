@@ -181,7 +181,8 @@ export async function winCertIsInstalled(identifier: CertIdentifierWithoutThumbp
     psCommandArgs = getPowershellHackArgs(`Write-Host (Get-ChildItem Cert:\\LocalMachine\\Root | Where-Object { $_.Subject -eq (Get-PfxCertificate -FilePath '${identifier.pfxPath}').Subject } | Measure-Object).Count`)
   }
 
-  logIf(mergedOptions.logTraceMessages, `checking if cert '${typeof identifier === 'string' ? `with subject '${identifier}` : `with pfxPath ${identifier.pfxPath}`}' is already installed`)
+  const tracePart = (typeof identifier === 'string') ? `subject ${identifier}` : `pfxPath ${identifier.pfxPath}`
+  logIf(mergedOptions.logTraceMessages, `checking if cert with ${tracePart} is already installed`)
 
   const result = await spawnAsync('powershell', psCommandArgs, { stdio: 'pipe' })
 
@@ -224,7 +225,8 @@ export async function winUninstallCert(identifier: CertIdentifier, options?: Par
     psCommandArgs = getPowershellHackArgs(`$thumbprint = (Get-PfxCertificate -FilePath '${identifier.pfxPath}').Thumbprint; Get-ChildItem Cert:\\LocalMachine\\Root | Where-Object { $_.Thumbprint -eq $thumbprint } | Remove-Item`)
   }
 
-  logIf(mergedOptions.logTraceMessages, `uninstalling cert ${typeof identifier === 'string' ? `'${identifier}'` : JSON.stringify(identifier)}`)
+  const tracePart = typeof identifier === 'string' ? `'${identifier}'` : JSON.stringify(identifier)
+  logIf(mergedOptions.logTraceMessages, `uninstalling cert ${tracePart}`)
 
   const result = await spawnAsync('powershell', psCommandArgs, { stdio: mergedOptions.logSpawnOutput ? 'inherit' : 'pipe' })
 

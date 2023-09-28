@@ -1,9 +1,9 @@
-import { ChildProcess, SpawnOptions, spawn } from 'node:child_process'
+import { ChildProcess, spawn } from 'node:child_process'
 import fs from 'node:fs'
 import fsp from 'node:fs/promises'
 import path from 'node:path'
 import { config } from './NodeCliUtilsConfig.js'
-import { SpawnError, SpawnOptionsWithThrow, SpawnResult, StringKeyedDictionary, isPlatformWindows, log, requireValidPath, sortDictionaryByKeyAsc, spawnAsync, stringToNonEmptyLines, trace } from './generalUtils.js'
+import { SpawnError, SpawnOptionsWithThrow, SpawnResult, StringKeyedDictionary, isPlatformWindows, log, requireString, requireValidPath, sortDictionaryByKeyAsc, spawnAsync, stringToNonEmptyLines, trace } from './generalUtils.js'
 
 const isCommonJS = typeof require === "function" && typeof module === "object" && module.exports
 const isEsm = !isCommonJS
@@ -71,71 +71,22 @@ export interface SpawnOptionsInternal extends SpawnOptionsWithThrow {
   isLongRunning: boolean
 }
 
-export async function spawnAsyncInternal(command: string, args?: string[], options?: Partial<SpawnOptionsInternal>): Promise<SpawnResult> {
-  const moduleDir = await getCurrentModuleDir()
+export async function spawnAsyncInternal(command: string, args: string[], options?: Partial<SpawnOptionsInternal>): Promise<SpawnResult> {
+  const mergedOptions = setDefaultsAndMergeOptions(options)
+  const logPrefix = `[${command} ${args.join(' ')}] `
+
+  // Windows has an issue where child processes are orphaned when using the shell option. This workaround will spawn
+  // a "middle" process using the shell option to check whether parent process is still running at intervals and if not, kill the child process tree.
+  const workaroundScriptPath = await getWorkaroundScriptPath(command, args, options)
+  if (workaroundScriptPath) {
+    return await spawnWithKeepaliveWorkaround(logPrefix, workaroundScriptPath, command, args, mergedOptions)
+  }
+
   return new Promise((resolve, reject) => {
     try {
-      const defaultSpawnOptions: SpawnOptions = { stdio: 'inherit' }
-      const argsForChildProcess = args ?? []
-      const logPrefix = `[${command} ${argsForChildProcess.join(' ')}] `
-      const mergedOptions = { ...defaultSpawnOptions, ...options }
-      const result: SpawnResult = {
-        code: 1,
-        stdout: '',
-        stderr: '',
-        cwd: mergedOptions.cwd?.toString() ?? process.cwd()
-      }
+      const result: SpawnResult = getInitialSpawnResult()
 
-      // Windows has an issue where child processes are orphaned when using the shell option. This workaround will spawn
-      // a "middle" process using the shell option to check whether parent process is still running at intervals and if not, kill the child process tree.
-      const workaroundCommand = 'node'
-      let workaroundScriptPath = path.join(moduleDir, spawnWorkaroundScriptName)
-
-      // This allows use of spawnAsyncLongRunning within this project (i.e. swigfile.ts)
-      if (!fs.existsSync(workaroundCommand) && workaroundScriptPath.includes('node-cli-utils')) {
-        workaroundScriptPath = path.resolve('dist/esm', spawnWorkaroundScriptName)
-      }
-
-      // First check if this is the request for the workaround process itself
-      if (options?.isLongRunning && isPlatformWindows() && command !== workaroundCommand && (!argsForChildProcess[0] || !argsForChildProcess[0].endsWith(spawnWorkaroundScriptName))) {
-        trace(`${logPrefix}Running on Windows with shell option - using middle process hack to prevent orphaned processes`)
-
-        const loggingEnabledString = config.orphanProtectionLoggingEnabled.toString()
-        const traceEnabledString = config.traceEnabled.toString()
-        const pollingMillisString = config.orphanProtectionPollingIntervalMillis.toString()
-
-        trace(`${logPrefix}Orphan protection logging enabled: ${loggingEnabledString}`)
-        trace(`${logPrefix}Orphan protection trace enabled: ${traceEnabledString}`)
-        trace(`${logPrefix}Orphan protection polling interval: ${pollingMillisString}ms`)
-        if (config.orphanProtectionLoggingEnabled) {
-          trace(`${logPrefix}Orphan protection logging path: ${config.orphanProtectionLoggingPath}`)
-        }
-
-        const workaroundArgs = [
-          workaroundScriptPath,
-          loggingEnabledString,
-          traceEnabledString,
-          pollingMillisString,
-          command,
-          ...(args ?? [])
-        ]
-
-        spawnAsync(workaroundCommand, workaroundArgs, { ...mergedOptions, stdio: 'inherit', shell: true })
-          .then((workaroundResult) => {
-            result.code = workaroundResult.code
-            if (options?.throwOnNonZero && result.code !== 0) {
-              reject(getSpawnError(result.code, result, options))
-              return
-            }
-            resolve(result)
-          }).catch((err) => {
-            reject(err)
-          })
-
-        return
-      }
-
-      const child = spawn(command, argsForChildProcess, mergedOptions)
+      const child = spawn(command, args, mergedOptions)
       const childId: number | undefined = child.pid
       if (childId === undefined) {
         throw new Error(`${logPrefix}ChildProcess pid is undefined - spawn failed`)
@@ -143,17 +94,11 @@ export async function spawnAsyncInternal(command: string, args?: string[], optio
 
       // This event will only be emitted when stdio is NOT set to 'inherit'
       child.stdout?.on('data', (data) => {
-        // Commenting this out for now. May provide an option to explicitly enable this later.
-        // For now use stdio of 'pipe' to get the output in the result object or 'inherit' to see it in the console.
-        // process.stdout.write(data) 
         result.stdout += data.toString()
       })
 
       // This event will only be emitted when stdio is NOT set to 'inherit'
       child.stderr?.on('data', (data) => {
-        // Commenting this out for now. May provide an option to explicitly enable this later.
-        // For now use stdio of 'pipe' to get the output in the result object or 'inherit' to see it in the console.
-        // process.stdout.write(data)
         result.stderr += data.toString()
       })
 
@@ -162,11 +107,10 @@ export async function spawnAsyncInternal(command: string, args?: string[], optio
       child.on('exit', (code, signal) => {
         const signalMessage = signal ? ` with signal ${signal}` : ''
         trace(`${logPrefix}ChildProcess exited with code ${code}${signalMessage}`)
-        // If long running, ctrl+c will cause null, which we don't necessarily want to consider an error
-        result.code = (code === null && options?.isLongRunning) ? 0 : code ?? 1
+        result.code = getResultCode(code, mergedOptions.isLongRunning)
         child.removeAllListeners()
         listener.detach()
-        if (options?.throwOnNonZero && result.code !== 0) {
+        if (mergedOptions.throwOnNonZero && result.code !== 0) {
           reject(getSpawnError(result.code, result, mergedOptions))
           return
         }
@@ -180,6 +124,72 @@ export async function spawnAsyncInternal(command: string, args?: string[], optio
       reject(err)
     }
   })
+}
+
+// If long running, ctrl+c will cause a null code, which we don't necessarily want to consider an error
+function getResultCode(code: number | null, isLongRunning: boolean) {
+  return (code === null && isLongRunning) ? 0 : code ?? 1
+}
+
+const setDefaultsAndMergeOptions = (options?: Partial<SpawnOptionsInternal>): SpawnOptionsInternal => {
+  const defaultSpawnOptions: SpawnOptionsInternal = { stdio: 'inherit', isLongRunning: false, throwOnNonZero: false }
+  return { ...defaultSpawnOptions, ...options }
+}
+
+// Return workaroundScriptPath if:
+// - Long running option set to true
+// - OS is Windows
+// - It's not the long running workaround call itself (avoid an infinite loop)
+// Otherwise return undefined
+async function getWorkaroundScriptPath(command: string, args?: string[], options?: Partial<SpawnOptionsInternal>): Promise<string | undefined> {
+  const moduleDir = await getCurrentModuleDir()
+  let workaroundScriptPath = path.join(moduleDir, spawnWorkaroundScriptName)
+
+  // This allows use of spawnAsyncLongRunning within this project (i.e. swigfile.ts)
+  if (!fs.existsSync(workaroundScriptPath) && workaroundScriptPath.includes('node-cli-utils')) {
+    workaroundScriptPath = path.resolve('dist/esm', spawnWorkaroundScriptName)
+  }
+
+  if (options?.isLongRunning && isPlatformWindows() && !(command === 'node' && args && args[0]?.endsWith(spawnWorkaroundScriptName))) {
+    return workaroundScriptPath
+  }
+
+  return undefined
+}
+
+async function spawnWithKeepaliveWorkaround(logPrefix: string, workaroundScriptPath: string, command: string, args: string[], options: Partial<SpawnOptionsInternal>) {
+  trace(`${logPrefix}Running on Windows with shell option - using middle process hack to prevent orphaned processes`)
+
+  const loggingEnabledString = config.orphanProtectionLoggingEnabled.toString()
+  const traceEnabledString = config.traceEnabled.toString()
+  const pollingMillisString = config.orphanProtectionPollingIntervalMillis.toString()
+
+  trace(`${logPrefix}Orphan protection logging enabled: ${loggingEnabledString}`)
+  trace(`${logPrefix}Orphan protection trace enabled: ${traceEnabledString}`)
+  trace(`${logPrefix}Orphan protection polling interval: ${pollingMillisString}ms`)
+  if (config.orphanProtectionLoggingEnabled) {
+    trace(`${logPrefix}Orphan protection logging path: ${config.orphanProtectionLoggingPath}`)
+  }
+
+  const workaroundArgs = [
+    workaroundScriptPath,
+    loggingEnabledString,
+    traceEnabledString,
+    pollingMillisString,
+    command,
+    ...(args ?? [])
+  ]
+
+  return await spawnAsync('node', workaroundArgs, { ...options, stdio: 'inherit', shell: true })
+}
+
+function getInitialSpawnResult(options?: SpawnOptionsInternal): SpawnResult {
+  return {
+    code: 1,
+    stdout: '',
+    stderr: '',
+    cwd: options?.cwd?.toString() ?? process.cwd()
+  }
 }
 
 function getSpawnError(code: number, result: SpawnResult, options: Partial<SpawnOptionsInternal>): SpawnError {
@@ -225,4 +235,22 @@ async function getCurrentModuleDir(): Promise<string> {
     return path.normalize(directory)
   }
   return __dirname
+}
+
+export function validateFindFilesRecursivelyParams(dir: string, filenamePattern: string) {
+  requireValidPath('dir', dir)
+  requireString('pattern', filenamePattern)
+
+  if (filenamePattern.length > 50) {
+    throw new Error(`filenamePattern param must have fewer than 50 characters`)
+  }
+
+  const numWildcards = filenamePattern.replace(/\*+/g, '*').split('*').length - 1
+  if (numWildcards > 5) {
+    throw new Error(`filenamePattern param must contain 5 or fewer wildcards`)
+  }
+
+  if (filenamePattern.includes('/') || filenamePattern.includes('\\')) {
+    throw new Error('filenamePattern param must not contain slashes')
+  }
 }

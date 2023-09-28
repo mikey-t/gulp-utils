@@ -34,10 +34,10 @@ export class TarballUtility {
   private mkdirpFn: typeof mkdirp
 
   constructor(dependencies: Partial<TarballUtilityDependencies> = {}) {
-    this.whichSyncFn = dependencies.whichSyncFn || whichSync
-    this.spawnAsyncFn = dependencies.spawnAsyncFn || spawnAsync
-    this.statSyncFn = dependencies.statSyncFn || fs.statSync
-    this.mkdirpFn = dependencies.mkdirpFn || mkdirp
+    this.whichSyncFn = dependencies.whichSyncFn ?? whichSync
+    this.spawnAsyncFn = dependencies.spawnAsyncFn ?? spawnAsync
+    this.statSyncFn = dependencies.statSyncFn ?? fs.statSync
+    this.mkdirpFn = dependencies.mkdirpFn ?? mkdirp
   }
 
   /**

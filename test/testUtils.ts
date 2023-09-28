@@ -24,9 +24,14 @@ export function fileExistsAndIsNonZero(filePath: string): boolean {
     const stats = fs.statSync(filePath)
     return stats.isFile() && stats.size > 0
   } catch (err) {
-    return false
+    const e = err as { code?: string }
+    if (e.code === 'ENOENT') {
+      return false // File doesn't exist
+    }
+    throw err // Rethrow other errors
   }
 }
+
 
 export function assertErrorMessageStartsWith(err: unknown, expectedStartsWith: string) {
   assert(err instanceof Error)

@@ -25,7 +25,8 @@ export function trace(message?: unknown, ...optionalParams: unknown[]) {
 }
 
 function logToFile(message: string) {
-  fs.appendFileSync(config.orphanProtectionLoggingPath, `${getLogPrefix()}${message}` + ((message && message.length && message[message.length - 1] !== '\n') ? '\n' : ''))
+  fs.appendFileSync(config.orphanProtectionLoggingPath, `${getLogPrefix()}${message}` + !message?.endsWith('\n') ? '\n' : '')
+
 }
 
 function traceAndLog(message: string, isDevTrace = false) {
@@ -126,10 +127,9 @@ try {
       clearInterval(interval)
       traceAndLog('Used taskkill and cleared interval - exiting...')
       process.exit(0)
-    } else {
-      if (DEV_LOGGING) {
-        traceAndLog('Parent is alive, keep running.')
-      }
+    }
+    if (DEV_LOGGING) {
+      traceAndLog('Parent is alive, keep running.')
     }
   }, pollingMillis)
 

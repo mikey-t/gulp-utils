@@ -108,7 +108,7 @@ async function getLastMigrationName(projectPath: string, dbContextName: string) 
   })
   log(`Found migrations: ${migrationNamesWithTimestamps.map(m => m.name).join(', ')}`)
   log(`Found timestamps: ${migrationNamesWithTimestamps.map(m => m.timestamp).join(', ')}`)
-  const sortedMigrationNames = migrationNamesWithTimestamps.sort((a, b) => a.timestamp.localeCompare(b.timestamp))
+  const sortedMigrationNames = migrationNamesWithTimestamps.toSorted((a, b) => a.timestamp.localeCompare(b.timestamp))
   const lastMigrationName = sortedMigrationNames[sortedMigrationNames.length - 1].name
   return lastMigrationName
 }
@@ -125,7 +125,7 @@ function getScriptPath(projectDirectory: string, migrationName: string, isUp: bo
   return path.join(projectDirectory, `Scripts/${migrationName}${isUp ? '' : '_Down'}.sql`)
 }
 
-async function addDbMigrationBoilerplate(projectDirectory: string, dbContextName: string, migrationName: string) {
+async function getCSharpMigrationFilePath(projectDirectory: string, dbContextName: string, migrationName: string) {
   const migrationsOutputDir = getMigrationsDirectory(projectDirectory, dbContextName)
 
   if (!fs.existsSync(migrationsOutputDir)) {
@@ -148,59 +148,24 @@ async function addDbMigrationBoilerplate(projectDirectory: string, dbContextName
   const filePath = path.join(migrationsOutputDir, filename)
 
   if (!fs.existsSync(filePath)) {
-    throw new Error(`Issue generating file path for migration (not found): ${filePath}`)
+    throw new Error(`Issue generating file path for migration (bad file path): ${filePath}`)
   }
 
-  log(`Adding boilerplate to file 📄${filePath}`)
+  return filePath
+}
 
-  const usingLine = 'using MikeyT.DbMigrations;'
-  const upLine = `MigrationScriptRunner.RunScript(migrationBuilder, "${migrationName}.sql");`
-  const downLine = `MigrationScriptRunner.RunScript(migrationBuilder, "${migrationName}_Down.sql");`
+async function addDbMigrationBoilerplate(projectDirectory: string, dbContextName: string, migrationName: string) {
+  const filePath = await getCSharpMigrationFilePath(projectDirectory, dbContextName, migrationName)
 
-  const fileContents = await fsp.readFile(filePath, { encoding: 'utf8' })
-  const lines = fileContents.replaceAll('\r', '').split('\n')
+  log(`Replacing file contents with boilerplate for file 📄${filePath}`)
 
-  const newLines = []
-
-  newLines.push(lines[0].trim())
-  newLines.push(usingLine)
-
-  let addUpLine = false
-  let addDownLine = false
-  let skipNextLineIfBlank = false
-  for (let i = 1; i < lines.length; i++) {
-    if (skipNextLineIfBlank && lines[i].trim().length === 0) {
-      skipNextLineIfBlank = false
-      continue
-    }
-    if (addUpLine) {
-      const newLine = lines[i].replace('{', `{\n\t\t\t${upLine}`)
-      newLines.push(newLine)
-      addUpLine = false
-      skipNextLineIfBlank = true
-      continue
-    }
-    if (addDownLine) {
-      const newLine = lines[i].replace('{', `{\n\t\t\t${downLine}`)
-      newLines.push(newLine)
-      addDownLine = false
-      skipNextLineIfBlank = true
-      continue
-    }
-    newLines.push(lines[i])
-    if (lines[i].includes('void Up')) {
-      addUpLine = true
-    }
-    if (lines[i].includes('void Down')) {
-      addDownLine = true
-    }
-  }
-
-  const newFileContents = newLines.join('\n')
+  const newFileContents = cSharpMigrationFileTemplate
+    .replaceAll(contextNamePlaceholder, dbContextName)
+    .replaceAll(migrationNamePlaceholder, migrationName)
 
   await fsp.writeFile(filePath, newFileContents, { encoding: 'utf8' })
 
-  log(`Updated file with boilerplate - please ensure it is correct: ${filePath}`)
+  log(`Updated file with boilerplate - please ensure it is correct: 📄${filePath}`)
 
   const upScriptPath = path.join(projectDirectory, `Scripts/${migrationName}.sql`)
   const downScriptPath = path.join(projectDirectory, `Scripts/${migrationName}_Down.sql`)
@@ -209,15 +174,39 @@ async function addDbMigrationBoilerplate(projectDirectory: string, dbContextName
   log(`  - 📄${upScriptPath}`)
   log(`  - 📄${downScriptPath}\n`)
 
-  if (!fs.existsSync(upScriptPath)) {
-    await fsp.writeFile(upScriptPath, '', { encoding: 'utf8' })
-  } else {
-    log('Skipping Up sql script (already exists)')
-  }
+  await writeEmptySqlFileIfNotExists(upScriptPath, 'Up')
+  await writeEmptySqlFileIfNotExists(downScriptPath, 'Down')
+}
 
-  if (!fs.existsSync(downScriptPath)) {
-    await fsp.writeFile(downScriptPath, '', { encoding: 'utf8' })
+async function writeEmptySqlFileIfNotExists(scriptPath: string, scriptType: 'Up' | 'Down') {
+  if (!fs.existsSync(scriptPath)) {
+    await fsp.writeFile(scriptPath, '', { encoding: 'utf8' })
   } else {
-    log('Skipping Down sql script (already exists)')
+    log(`Skipping ${scriptType} sql script (already exists)`)
   }
 }
+
+const contextNamePlaceholder = '{{context_name}}'
+const migrationNamePlaceholder = '{{migration_name}}'
+const cSharpMigrationFileTemplate = `using Microsoft.EntityFrameworkCore.Migrations;
+using MikeyT.DbMigrations;
+
+#nullable disable
+
+namespace DbMigrator.Migrations.${contextNamePlaceholder}Migrations
+{
+    public partial class ${migrationNamePlaceholder} : Migration
+    {
+        protected override void Up(MigrationBuilder migrationBuilder)
+        {
+            MigrationScriptRunner.RunScript(migrationBuilder, "${migrationNamePlaceholder}.sql");
+        }
+
+        protected override void Down(MigrationBuilder migrationBuilder)
+        {
+            MigrationScriptRunner.RunScript(migrationBuilder, "${migrationNamePlaceholder}_Down.sql");
+        }
+    }
+}
+
+`
