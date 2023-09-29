@@ -975,7 +975,7 @@ export function getHostname(url: string): string {
   trace(`attempting to convert url to hostname: ${url}`)
   try {
     const encodedUrl = encodeURI(url)
-    const parsedUrl = new URL(encodedUrl.startsWith('http') ? encodedUrl : 'http://' + encodedUrl)
+    const parsedUrl = new URL(encodedUrl.startsWith('http') ? encodedUrl : 'https://' + encodedUrl)
     trace(`parsed url: ${parsedUrl}`)
     return parsedUrl.hostname
   } catch (e) {
