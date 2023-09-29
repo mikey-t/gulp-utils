@@ -1082,6 +1082,26 @@ export interface WithRetryOptions {
   traceEnabled: boolean
 }
 
+export function getNormalizedError(err: unknown): Error {
+  let lastErrorAsError: Error
+  if (err === undefined || err === null) {
+    lastErrorAsError = new Error('lastError was undefined or null')
+  } else if (err instanceof Error) {
+    lastErrorAsError = err
+  } else if (typeof err === 'string') {
+    lastErrorAsError = new Error(err)
+  } else if (err instanceof Object) {
+    try {
+      lastErrorAsError = new Error(JSON.stringify(err))
+    } catch (jsonError) {
+      lastErrorAsError = new Error('Object could not be serialized - could not normalize')
+    }
+  } else {
+    lastErrorAsError = new Error(`Unknown error of type ${typeof err} - could not normalize`)
+  }
+  return lastErrorAsError
+}
+
 /**
  * Call a function until it succeeds. Will stop after the number of calls specified by {@param maxCalls}, or forever if -1 is passed.
  * @param func The function to call
@@ -1122,7 +1142,7 @@ export async function withRetryAsync(func: () => Promise<void>, maxCalls: number
     }
 
     if (!forever && attemptNumber === maxCalls) {
-      throw new Error(`Failed to run method with retry after ${maxCalls} attempts`, { cause: lastError })
+      throw new ExtendedError(`Failed to run method with retry after ${maxCalls} attempts`, getNormalizedError(lastError))
     }
 
     retryLog(`attempt number ${attemptNumber} failed - waiting ${delayMilliseconds} milliseconds before trying again`)

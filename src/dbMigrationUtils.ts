@@ -108,7 +108,7 @@ async function getLastMigrationName(projectPath: string, dbContextName: string) 
   })
   log(`Found migrations: ${migrationNamesWithTimestamps.map(m => m.name).join(', ')}`)
   log(`Found timestamps: ${migrationNamesWithTimestamps.map(m => m.timestamp).join(', ')}`)
-  const sortedMigrationNames = migrationNamesWithTimestamps.toSorted((a, b) => a.timestamp.localeCompare(b.timestamp))
+  const sortedMigrationNames = [...migrationNamesWithTimestamps].sort((a, b) => a.timestamp.localeCompare(b.timestamp))
   const lastMigrationName = sortedMigrationNames[sortedMigrationNames.length - 1].name
   return lastMigrationName
 }
