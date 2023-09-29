@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test'
-import { humanizeTime, requireString } from '../src/generalUtils.js'
+import { humanizeTime, requireString, which, whichSync } from '../src/generalUtils.js'
 import assert from 'node:assert'
-import { assertErrorMessageEquals } from './testUtils.js'
+import { assertErrorMessageEquals, assertErrorMessageStartsWith } from './testUtils.js'
 
 const testParamName = 'test'
 const expectedRequireStringError = `Required param '${testParamName}' is missing`
@@ -55,5 +55,39 @@ describe('requireString', () => {
   it('throws if paramValue is not a string', () => {
     // @ts-ignore
     assert.throws(() => requireString(testParamName, { someProp: 'some-val' }), err => assertErrorMessageEquals(err, expectedRequireStringError))
+  })
+})
+
+describe('which', () => {
+  it('should return the path to the executable', async () => {
+    const result = await which('node')
+    assert.ok(result && (result.location?.endsWith('node') || result.location?.endsWith('node.exe')))
+  })
+  it('should have a result with an undefined location if the executable is not found', async () => {
+    const result = await which('some-non-existent-executable')
+    assert.ok(result && result.location === undefined)
+  })
+  it('does not allow empty string', async () => {
+    await assert.rejects(which(''), err => assertErrorMessageEquals(err, `Required param 'commandName' is missing`))
+  })
+  it('does not allow shell metacharacters', async () => {
+    await assert.rejects(which('node; echo "hello"'), err => assertErrorMessageStartsWith(err, `commandName cannot contain shell meta characters`))
+  })
+})
+
+describe('whichSync', () => {
+  it('should return the path to the executable', () => {
+    const result = whichSync('node')
+    assert.ok(result && (result.location?.endsWith('node') || result.location?.endsWith('node.exe')))
+  })
+  it('should have a result with an undefined location if the executable is not found', () => {
+    const result = whichSync('some-non-existent-executable')
+    assert.ok(result && result.location === undefined)
+  })
+  it('does not allow empty string', () => {
+    assert.throws(() => whichSync(''), err => assertErrorMessageEquals(err, `Required param 'commandName' is missing`))
+  })
+  it('does not allow shell metacharacters', () => {
+    assert.throws(() => whichSync('node; echo "hello"'), err => assertErrorMessageStartsWith(err, `commandName cannot contain shell meta characters`))
   })
 })

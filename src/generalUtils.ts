@@ -4,8 +4,9 @@ import fsp from 'node:fs/promises'
 import { platform } from 'node:os'
 import path, { resolve } from 'node:path'
 import * as readline from 'readline'
+import * as net from 'net'
 import { config } from './NodeCliUtilsConfig.js'
-import { SpawnOptionsInternal, copyEnv, dictionaryToEnvFileString, getEnvAsDictionary, simpleSpawnAsyncInternal, simpleSpawnSyncInternal, spawnAsyncInternal, validateFindFilesRecursivelyParams } from './generalUtilsInternal.js'
+import { SpawnOptionsInternal, copyEnv, dictionaryToEnvFileString, getEnvAsDictionary, simpleSpawnAsyncInternal, simpleSpawnSyncInternal, spawnAsyncInternal, validateFindFilesRecursivelyParams, whichInternal } from './generalUtilsInternal.js'
 
 // For JSDoc links
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -197,6 +198,15 @@ export async function ensureDirectory(dir: string) {
 export async function mkdirp(dir: string) {
   requireString('dir', dir)
   await fsp.mkdir(dir, { recursive: true })
+}
+
+/**
+ * Create a directory. Will create parent directory structure if it don't exist. Similar to `mkdir -p`.
+ * @param dir The directory to create. 
+ */
+export async function mkdirpSync(dir: string) {
+  requireString('dir', dir)
+  fs.mkdirSync(dir, { recursive: true })
 }
 
 /**
@@ -471,13 +481,23 @@ export async function spawnDockerCompose(dockerComposePath: string, dockerCompos
 }
 
 /**
- * Splits a string into lines, removing empty lines and carriage return characters.
+ * Splits a string into lines, removing `\n` and `\r` characters. Does not return empty lines. Also see {@link stringToLines}.
  * @param str String to split into lines
  * @returns An array of lines from the string, with empty lines removed
  */
 export function stringToNonEmptyLines(str: string): string[] {
   if (!str) { return [] }
   return str.split('\n').filter(line => line?.trim()).map(line => line.replace('\r', ''))
+}
+
+/**
+ * Splits a string into lines, removing `\n` and `\r` characters. Returns empty lines. Also see {@link stringToNonEmptyLines}.
+ * @param str String to split into lines
+ * @returns An array of lines from the string, with empty lines removed
+ */
+export function stringToLines(str: string): string[] {
+  if (!str) { return [] }
+  return str.split('\n').map(line => line.replace('\r', ''))
 }
 
 /**
@@ -581,7 +601,7 @@ export function isPlatformMac() {
 
 /**
  * 
- * @returns `true` if {@link isPlatformWindows} and {@link isPlatformMac} are both `false, otherwise returns `false`
+ * @returns `true` if {@link isPlatformWindows} and {@link isPlatformMac} are both `false, otherwise returns `true`
  */
 export function isPlatformLinux() {
   return !isPlatformWindows() && !isPlatformMac()
@@ -589,50 +609,22 @@ export function isPlatformLinux() {
 
 /**
  * This is a cross-platform method to get the location of a system command. Useful for checking if software
- * is installed, where it's installed and whether there are multiple locations for a command.
+ * is installed, where it's installed and whether there are multiple locations.
  * @param commandName The name of the command to find
  * @returns The location of the command, any additional locations, and an error if one occurred
  */
-export function whichSync(commandName: string): WhichResult {
-  if (isPlatformWindows()) {
-    const result = simpleCmdSync('where', [commandName])
-    return {
-      location: result.stdoutLines[0],
-      additionalLocations: result.stdoutLines.slice(1),
-      error: result.error
-    }
-  } else {
-    const result = simpleSpawnSync('which', ['-a', commandName])
-    return {
-      location: result.stdoutLines[0],
-      additionalLocations: result.stdoutLines.slice(1),
-      error: result.error
-    }
-  }
+export async function which(commandName: string): Promise<WhichResult> {
+  return whichInternal(commandName, simpleCmdAsync, simpleSpawnAsync)
 }
 
 /**
  * This is a cross-platform method to get the location of a system command. Useful for checking if software
- * is installed, where it's installed and whether there are multiple locations for a command.
+ * is installed, where it's installed and whether there are multiple locations.
  * @param commandName The name of the command to find
  * @returns The location of the command, any additional locations, and an error if one occurred
  */
-export async function whichAsync(commandName: string): Promise<WhichResult> {
-  if (isPlatformWindows()) {
-    const result = await simpleCmdAsync('where', [commandName])
-    return {
-      location: result.stdoutLines[0],
-      additionalLocations: result.stdoutLines.slice(1),
-      error: result.error
-    }
-  } else {
-    const result = await simpleSpawnAsync('which', ['-a', commandName])
-    return {
-      location: result.stdoutLines[0],
-      additionalLocations: result.stdoutLines.slice(1),
-      error: result.error
-    }
-  }
+export function whichSync(commandName: string): WhichResult {
+  return whichInternal(commandName, simpleCmdSync, simpleSpawnSync) as WhichResult
 }
 
 /**
@@ -977,6 +969,206 @@ export class ExtendedError extends Error {
     Object.setPrototypeOf(this, ExtendedError.prototype)
   }
 }
+
+export function getHostname(url: string): string {
+  requireString('url', url)
+  trace(`attempting to convert url to hostname: ${url}`)
+  try {
+    const encodedUrl = encodeURI(url)
+    const parsedUrl = new URL(encodedUrl.startsWith('http') ? encodedUrl : 'http://' + encodedUrl)
+    trace(`parsed url: ${parsedUrl}`)
+    return parsedUrl.hostname
+  } catch (e) {
+    throw new ExtendedError("Invalid URL", e as Error)
+  }
+}
+
+export async function isDirectory(path: string): Promise<boolean> {
+  try {
+    const stats = await fsp.stat(path)
+    return stats.isDirectory()
+  } catch (err) {
+    trace('error checking idDirectory (returning false)', err)
+    return false
+  }
+}
+
+export function isDirectorySync(path: string): boolean {
+  try {
+    const stats = fs.statSync(path)
+    return stats.isDirectory()
+  } catch (err) {
+    trace('error checking idDirectory (returning false)', err)
+    return false
+  }
+}
+
+export type PlatformCode = 'win' | 'linux' | 'mac'
+
+/**
+ * This is a somewhat naive method but is useful if you rarely or never deal with unusual operating systems.
+ * @returns `win`, `mac` or `linux`
+ */
+export function getPlatformCode(): PlatformCode {
+  if (isPlatformWindows()) {
+    return 'win'
+  }
+  if (isPlatformMac()) {
+    return 'mac'
+  }
+  if (isPlatformLinux()) {
+    return 'linux'
+  }
+  throw new Error('unrecognized platform: ' + platform())
+}
+
+/**
+ * Tries connecting to a port to see if it's being listened on or not. It's likely that this won't work in a lot of scenarios, so use it at your own risk.
+ * @param port The port to check
+ * @returns `true` if the port is available, `false` otherwise
+ */
+export async function isPortAvailable(port: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const tester = net.connect(port, '127.0.0.1')
+
+    tester.on('connect', () => {
+      tester.destroy()
+      resolve(false) // port is in use
+    })
+
+    tester.on('error', (err: NodeJS.ErrnoException) => {
+      tester.destroy()
+      if (err.code === 'ECONNREFUSED') {
+        resolve(true) // port is available
+      } else {
+        resolve(false) // some other error occurred, assume port is in use
+      }
+    })
+  })
+}
+
+/**
+ * Returns the value for an environment variable or throws if it's undefined or null. Pass optional {@param throwOnEmpty} to throw when the key exists but has an empty value.
+ * @param varName The name of the environment variable to get.
+ * @param throwOnEmpty Throw an error if key exists (not undefined or null) but is empty.
+ * @returns 
+ */
+export function getRequiredEnvVar(varName: string, throwOnEmpty = true): string {
+  requireString('varName', varName)
+  const val = process.env[varName]
+  if (val === undefined || val === null) {
+    throw new Error(`Missing required environment variable: ${varName}`)
+  }
+  if (throwOnEmpty && val.trim() === '') {
+    throw new Error(`Required environment variable is empty: ${varName}`)
+  }
+  return val
+}
+
+/** Options for {@link withRetryAsync}. */
+export interface WithRetryOptions {
+  /**
+   * Number of milliseconds to wait before the first attempt.
+   */
+  initialDelayMilliseconds: number
+  /**
+   * Use this in log messages instead of the function name (useful for passing lambdas which would otherwise display as "anonymous").
+   */
+  functionLabel?: string
+  /**
+   * If NodeCliUtilsConfig.traceEnabled is `true` then messages will be logged even if this option is `false`.
+   * Set to `true` to log messages even if Node ]
+   */
+  traceEnabled: boolean
+}
+
+/**
+ * Call a function until it succeeds. Will stop after the number of calls specified by {@param maxCalls}, or forever if -1 is passed.
+ * @param func The function to call
+ * @param maxCalls The maximum number of times to call the function before giving up. Pass -1 to retry forever.
+ * @param delayMilliseconds The number of milliseconds to wait between calls
+ * @param options Options for controlling the behavior of the retry. See {@link WithRetryOptions}.
+ */
+export async function withRetryAsync(func: () => Promise<void>, maxCalls: number, delayMilliseconds: number, options?: Partial<WithRetryOptions>) {
+  let attemptNumber = 0
+  let lastError: unknown
+  const forever = maxCalls === -1
+
+  const defaultOptions: WithRetryOptions = { initialDelayMilliseconds: 0, traceEnabled: false }
+  const mergedOptions: WithRetryOptions = { ...defaultOptions, ...options }
+
+  const shouldLog = config.traceEnabled || mergedOptions.traceEnabled
+  const retryLog = shouldLog ? log : () => { }
+  const funcName = mergedOptions.functionLabel ?? func.name ?? 'anonymous'
+
+  if (mergedOptions.initialDelayMilliseconds > 0) {
+    retryLog(`initialDelayMilliseconds set to ${mergedOptions.initialDelayMilliseconds} - waiting before first try`)
+    await sleep(mergedOptions.initialDelayMilliseconds)
+  }
+
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    attemptNumber++
+    retryLog(`calling ${funcName} - attempt number ${attemptNumber}`)
+    try {
+      await func()
+      retryLog(`attempt ${attemptNumber} was successful`)
+      break
+    } catch (err) {
+      if (shouldLog) {
+        console.error(err)
+      }
+      lastError = err
+    }
+
+    if (!forever && attemptNumber === maxCalls) {
+      throw new Error(`Failed to run method with retry after ${maxCalls} attempts`, { cause: lastError })
+    }
+
+    retryLog(`attempt number ${attemptNumber} failed - waiting ${delayMilliseconds} milliseconds before trying again`)
+    await sleep(delayMilliseconds)
+  }
+}
+
+/**
+ * Collapses each instance of consecutive whitespace characters into a single space.
+ */
+export function collapseWhitespace(str: string): string {
+  return str.replace(/\s+/g, ' ')
+}
+
+/**
+ * Check if a string is a valid directory name. This is a very simple check that just makes sure the string doesn't contain any invalid characters.
+ * @param dirName The directory name to check
+ * @returns `true` if the directory name is valid, `false` otherwise
+ */
+export function isValidDirName(dirName: string): boolean {
+  // List of generally invalid characters for directory names in Windows, macOS, and Linux
+  const invalidChars = ['<', '>', ':', '"', '/', '\\', '|', '?', '*']
+
+  for (const char of dirName) {
+    if (invalidChars.includes(char) || char.charCodeAt(0) <= 31) {
+      return false
+    }
+  }
+
+  return true
+}
+
+export function hasWhitespace(str: string): boolean {
+  return /\s/.test(str)
+}
+
+export function stripShellMetaCharacters(input: string): string {
+  const metaCharacters = [
+    '\\', '`', '$', '"', "'", '<', '>', '|', ';', ' ',
+    '&', '(', ')', '[', ']', '{', '}', '?', '*', '#', '~', '^'
+  ]
+  const escapeRegex = (str: string) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const regex = new RegExp(`[${metaCharacters.map(escapeRegex).join('')}]`, 'g')
+  return input.replace(regex, '')
+}
+
 
 export enum AnsiColor {
   RESET = '\x1b[0m',

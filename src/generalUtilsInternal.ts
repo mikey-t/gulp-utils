@@ -3,7 +3,7 @@ import fs from 'node:fs'
 import fsp from 'node:fs/promises'
 import path from 'node:path'
 import { config } from './NodeCliUtilsConfig.js'
-import { SimpleSpawnError, SimpleSpawnResult, SpawnError, SpawnOptionsWithThrow, SpawnResult, StringKeyedDictionary, isPlatformWindows, log, requireString, requireValidPath, sortDictionaryByKeyAsc, spawnAsync, stringToNonEmptyLines, trace } from './generalUtils.js'
+import { SimpleSpawnError, SimpleSpawnResult, SpawnError, SpawnOptionsWithThrow, SpawnResult, StringKeyedDictionary, WhichResult, isPlatformWindows, log, requireString, requireValidPath, sortDictionaryByKeyAsc, spawnAsync, stringToNonEmptyLines, stripShellMetaCharacters, trace } from './generalUtils.js'
 
 const isCommonJS = typeof require === "function" && typeof module === "object" && module.exports
 const isEsm = !isCommonJS
@@ -295,4 +295,46 @@ export async function simpleSpawnAsyncInternal(command: string, args?: string[],
   }
 
   return spawnResult
+}
+
+type SimpleSpawnFunction = (cmd: string, args: string[]) => Promise<SimpleSpawnResult> | SimpleSpawnResult
+
+export function whichInternal(commandName: string, simpleCmd: SimpleSpawnFunction, simpleSpawn: SimpleSpawnFunction): Promise<WhichResult> | WhichResult {
+  requireString('commandName', commandName)
+
+  if (stripShellMetaCharacters(commandName) !== commandName) {
+    throw new Error(`commandName cannot contain shell meta characters: ${commandName}`)
+  }
+
+  const execFunc = isPlatformWindows() ? simpleCmd : simpleSpawn
+  const cmd = isPlatformWindows() ? 'where' : 'which'
+  const args = isPlatformWindows() ? [commandName] : ['-a', commandName]
+
+  try {
+    const result = execFunc(cmd, args)
+
+    if (result instanceof Promise) {
+      return result.then(parsedResult => ({
+        location: parsedResult.stdoutLines[0],
+        additionalLocations: parsedResult.stdoutLines.slice(1),
+        error: parsedResult.error
+      })).catch(err => ({
+        location: undefined,
+        additionalLocations: undefined,
+        error: err
+      }))
+    }
+
+    return {
+      location: result.stdoutLines[0],
+      additionalLocations: result.stdoutLines.slice(1),
+      error: result.error
+    }
+  } catch (err) {
+    return {
+      location: undefined,
+      additionalLocations: undefined,
+      error: err as Error
+    }
+  }
 }
