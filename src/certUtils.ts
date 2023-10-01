@@ -10,7 +10,6 @@ import {
   isPlatformMac,
   isPlatformWindows,
   logIf,
-  red,
   requireString,
   requireValidPath,
   simpleSpawnSync,
@@ -18,6 +17,7 @@ import {
   stringToNonEmptyLines,
   whichSync
 } from './generalUtils.js'
+import { red } from './colors.js'
 
 /** Control what is logged when running certUtils functions. */
 export interface CertLogOptions {

@@ -3,7 +3,6 @@ node_modules
 dist
 .env
 **/docker/pg
-test/tmp/*
-!test/tmp/placeholder.txt
-.scannerwork
+test/temp/*
+!test/temp/placeholder.txt
 coverage

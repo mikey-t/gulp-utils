@@ -197,7 +197,13 @@ export async function ensureDirectory(dir: string) {
  */
 export async function mkdirp(dir: string) {
   requireString('dir', dir)
-  await fsp.mkdir(dir, { recursive: true })
+  try {
+    await fsp.mkdir(dir, { recursive: true })
+  } catch (err) {
+    // Must catch and re-throw in order to get a stack trace: https://github.com/nodejs/node/issues/30944
+    throw new ExtendedError('Error creating directory', getNormalizedError(err))
+  }
+
 }
 
 /**
@@ -1189,28 +1195,6 @@ export function stripShellMetaCharacters(input: string): string {
   return input.replace(regex, '')
 }
 
-
-export enum AnsiColor {
-  RESET = '\x1b[0m',
-  RED = '\x1b[31m',
-  GREEN = '\x1b[32m',
-  YELLOW = '\x1b[33m',
-  CYAN = '\x1b[96m',
-  GRAY = '\x1b[90m',
-  PURPLE = '\x1b[35m'
-}
-
-export const color = (str: string, colorAnsiCode: AnsiColor): string => {
-  return `${colorAnsiCode}${str}${AnsiColor.RESET}`
-}
-
-export const red = (str: string) => color(str, AnsiColor.RED)
-export const green = (str: string) => color(str, AnsiColor.GREEN)
-export const cyan = (str: string) => color(str, AnsiColor.CYAN)
-export const gray = (str: string) => color(str, AnsiColor.GRAY)
-export const purple = (str: string) => color(str, AnsiColor.PURPLE)
-export const yellow = (str: string) => color(str, AnsiColor.YELLOW)
-
 export enum Emoji {
   RightArrow = '➡️',
   LeftArrow = '⬅️',
@@ -1228,3 +1212,4 @@ export enum Emoji {
   Certificate = '📜',
   Key = '🔑',
 }
+

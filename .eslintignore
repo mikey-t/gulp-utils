@@ -1,7 +1,8 @@
-.scannerwork
 .vscode
+coverage
 dist
 docs
 node_modules
-playground
 docker
+test/fixtures
+test/temp

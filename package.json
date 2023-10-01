@@ -1,6 +1,6 @@
 {
   "name": "@mikeyt23/node-cli-utils",
-  "version": "2.0.0-beta.2",
+  "version": "2.0.0-beta.3",
   "description": "Some node cli utility functions",
   "author": "Mike Thompson",
   "license": "MIT",
@@ -48,6 +48,38 @@
       "require": {
         "default": "./dist/cjs/dbMigrationUtils.js"
       }
+    },
+    "./colors": {
+      "import": {
+        "default": "./dist/esm/colors.js"
+      },
+      "require": {
+        "default": "./dist/cjs/colors.js"
+      }
+    },
+    "./DependencyChecker": {
+      "import": {
+        "default": "./dist/esm/DependencyChecker.js"
+      },
+      "require": {
+        "default": "./dist/cjs/DependencyChecker.js"
+      }
+    },
+    "./hostFileUtils": {
+      "import": {
+        "default": "./dist/esm/hostFileUtils.js"
+      },
+      "require": {
+        "default": "./dist/cjs/hostFileUtils.js"
+      }
+    },
+    "./testUtils": {
+      "import": {
+        "default": "./dist/esm/testUtils.js"
+      },
+      "require": {
+        "default": "./dist/cjs/testUtils.js"
+      }
     }
   },
   "main": "./dist/esm/index.js",
@@ -71,11 +103,13 @@
     "c8": "^8.0.1",
     "dotenv": "^16.3.1",
     "eslint": "^8.49.0",
-    "swig-cli": "^0.0.14",
     "ts-node": "^10.9.1",
     "tsx": "^3.12.10",
     "typedoc": "^0.25.1",
     "typedoc-plugin-missing-exports": "^2.1.0",
     "typescript": "^5.2.2"
+  },
+  "dependencies": {
+    "swig-cli": "^0.0.14"
   }
 }

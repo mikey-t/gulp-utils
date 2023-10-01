@@ -3,9 +3,9 @@ import fsp from 'node:fs/promises'
 import path from 'node:path'
 import { beforeEach, describe, it } from 'node:test'
 import { GenerateCertOptions, generateCertWithOpenSsl, winCertIsInstalled, winGetPfxInfo, winInstallCert, winUninstallCert } from '../src/certUtils.js'
-import { assertErrorMessageIncludes, ensureEmptyTmpDir, fileExistsAndIsNonZero, tmpDir } from './testUtils.js'
+import { assertErrorMessageIncludes, ensureEmptyTempDir, fileExistsAndIsNonZero, tempDir } from '../src/testUtils.js'
 
-const certTempDir = path.join(tmpDir, 'cert-test')
+const certTempDir = path.join(tempDir, 'cert-test')
 const shouldLog = false
 const certOptions: GenerateCertOptions = { outputDirectory: certTempDir, logSpawnOutput: shouldLog, logTraceMessages: shouldLog, logSuccess: shouldLog, logElevatedPermissionsMessage: shouldLog }
 const url = 'local.cert-test.mikeyt.net'
@@ -20,7 +20,7 @@ function getExpectedCertFilePaths(url: string) {
 }
 
 beforeEach(async () => {
-  await ensureEmptyTmpDir(certTempDir)
+  await ensureEmptyTempDir(certTempDir)
 })
 
 describe('generateCertWithOpenSsl', () => {

@@ -6,7 +6,6 @@
     "declaration": true,
     "declarationMap": true,
     "inlineSourceMap": true,
-    "outDir": "./dist/esm",
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
@@ -15,11 +14,9 @@
     "types": [
       "node"
     ],
-    "typeRoots": [
-      "node_modules/@types"
-    ],
     "baseUrl": "./",
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    "noEmit": true
   },
   "include": [
     "swigfile.ts",
@@ -31,7 +28,9 @@
     "docs",
     "playground",
     "node_modules",
-    "docker"
+    "docker",
+    "test/fixtures",
+    "test/temp"
   ],
   "ts-node": {
     "transpileOnly": true

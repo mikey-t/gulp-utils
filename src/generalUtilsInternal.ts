@@ -299,6 +299,7 @@ export async function simpleSpawnAsyncInternal(command: string, args?: string[],
 
 type SimpleSpawnFunction = (cmd: string, args: string[]) => Promise<SimpleSpawnResult> | SimpleSpawnResult
 
+// Spawn functions passed here so they can be mocked in tests
 export function whichInternal(commandName: string, simpleCmd: SimpleSpawnFunction, simpleSpawn: SimpleSpawnFunction): Promise<WhichResult> | WhichResult {
   requireString('commandName', commandName)
 

@@ -5,16 +5,16 @@ import path, { join } from 'node:path'
 import { beforeEach, describe, it } from 'node:test'
 import { whichSync, WhichResult, mkdirp, spawnAsync, SpawnResult } from '../src/generalUtils.js'
 import { TarballUtility } from '../src/TarballUtility.js'
-import { assertErrorMessageStartsWith, ensureEmptyTmpDir, fileExistsAndIsNonZero, fixturesDir, tmpDir } from './testUtils.js'
+import { assertErrorMessageStartsWith, ensureEmptyTempDir, fileExistsAndIsNonZero, fixturesDir, tempDir } from '../src/testUtils.js'
 import { config } from '../src/NodeCliUtilsConfig.js'
 
 config.traceEnabled = false
 
-const tarballTmpDir = path.join(tmpDir, 'tarball-test')
+const tarballTempDir = path.join(tempDir, 'tarball-test')
 const dirToTarball = join(fixturesDir, 'dirToTarball')
-const tarballPath = join(tarballTmpDir, 'test.tar.gz')
+const tarballPath = join(tarballTempDir, 'test.tar.gz')
 const defaultTarballUtility = new TarballUtility()
-const unpackedTestDir = path.join(tarballTmpDir, 'unpacked-test')
+const unpackedTestDir = path.join(tarballTempDir, 'unpacked-test')
 const fixtureTarball = path.join(fixturesDir, 'test.tar.gz')
 
 function assertDefaultTarballContents(withStripComponentsZero: boolean = false) {
@@ -39,7 +39,7 @@ function assertTarballExists(archivePath: string) {
 }
 
 beforeEach(async () => {
-  await ensureEmptyTmpDir(tarballTmpDir)
+  await ensureEmptyTempDir(tarballTempDir)
 })
 
 describe('createTarball', () => {
@@ -69,7 +69,7 @@ describe('createTarball', () => {
   })
 
   it('throws if tarballPath does not end in .tar.gz', async () => {
-    const invalidTarballPath = join(tarballTmpDir, 'invalid.tar')
+    const invalidTarballPath = join(tarballTempDir, 'invalid.tar')
     await assert.rejects(
       defaultTarballUtility.createTarball(dirToTarball, invalidTarballPath),
       err => assertErrorMessageStartsWith(err, `tarballPath must end with '.tar.gz':`))
@@ -86,7 +86,7 @@ describe('createTarball', () => {
   })
 
   it('creates the output directory if it does\'t exist', async () => {
-    const tarballPathTempSubDir = path.join(tarballTmpDir, 'sub-dir', 'test.tar.gz')
+    const tarballPathTempSubDir = path.join(tarballTempDir, 'sub-dir', 'test.tar.gz')
     await defaultTarballUtility.createTarball(dirToTarball, tarballPathTempSubDir)
     assertTarballExists(tarballPathTempSubDir)
   })
@@ -234,7 +234,7 @@ describe('unpackTarball', () => {
   })
 
   it('throws if the unpackDirectory exists but is not a directory', async () => {
-    const dummyFilePath = path.join(tarballTmpDir, 'dummy.txt')
+    const dummyFilePath = path.join(tarballTempDir, 'dummy.txt')
     await fsp.writeFile(dummyFilePath, 'dummy')
     await assert.rejects(
       defaultTarballUtility.unpackTarball(fixtureTarball, dummyFilePath),

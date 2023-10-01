@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test'
 import { humanizeTime, requireString, which, whichSync } from '../src/generalUtils.js'
 import assert from 'node:assert'
-import { assertErrorMessageEquals, assertErrorMessageStartsWith } from './testUtils.js'
+import { assertErrorMessageEquals, assertErrorMessageStartsWith } from '../src/testUtils.js'
 
 const testParamName = 'test'
 const expectedRequireStringError = `Required param '${testParamName}' is missing`
