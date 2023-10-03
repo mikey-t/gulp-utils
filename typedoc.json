@@ -1,11 +1,14 @@
 {
   "$schema": "https://typedoc.org/schema.json",
   "entryPoints": [
+    "src/index.ts",
     "src/certUtils.ts",
     "src/dotnetUtils.ts",
     "src/dbMigrationUtils.ts",
     "src/NodeCliUtilsConfig.ts",
-    "./src/index.ts"
+    "src/DependencyChecker.ts",
+    "src/hostFileUtils.ts",
+    "src/testUtils.ts"
   ],
   "out": "./docs",
   "cleanOutputDir": true,

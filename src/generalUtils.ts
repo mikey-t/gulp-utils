@@ -215,17 +215,29 @@ export async function mkdirpSync(dir: string) {
   fs.mkdirSync(dir, { recursive: true })
 }
 
+export interface EmptyDirectoryOptions {
+  /** An optional array of file and directory names to skip, but only at the top level of the directoryToEmpty. */
+  fileAndDirectoryNamesToSkip: string[]
+  force: boolean
+  throwIfNotExists: boolean
+}
+
 /**
- * Empties a directory of all files and subdirectories.
- * 
- * Optionally skips files and directories at the top level.
+ * Empties a directory of all files and subdirectories. Optionally skips files and directories at the top level. For other
+ * options, see {@link EmptyDirectoryOptions}.
  * @param directoryToEmpty The directory to empty.
- * @param fileAndDirectoryNamesToSkip An optional array of file and directory names to skip, but only at the top level of the directoryToEmpty.
+ * @param options See {@link EmptyDirectoryOptions}.
  */
-export async function emptyDirectory(directoryToEmpty: string, fileAndDirectoryNamesToSkip?: string[]) {
+export async function emptyDirectory(directoryToEmpty: string, options?: Partial<EmptyDirectoryOptions>) {
   requireString('directoryToEmpty', directoryToEmpty)
 
+  const defaultOptions: EmptyDirectoryOptions = { fileAndDirectoryNamesToSkip: [], force: false, throwIfNotExists: false }
+  const mergedOptions: EmptyDirectoryOptions = { ...defaultOptions, ...options }
+
   if (!fs.existsSync(directoryToEmpty)) {
+    if (mergedOptions.throwIfNotExists) {
+      throw new Error('Directory does not exist and throwIfNotExists was set to true')
+    }
     trace(`directoryToEmpty does not exist - creating directory ${directoryToEmpty}`)
     await mkdirp(directoryToEmpty)
     return
@@ -237,7 +249,7 @@ export async function emptyDirectory(directoryToEmpty: string, fileAndDirectoryN
 
   // Add some guardrails to prevent accidentally emptying the wrong directory
   const absolutePath = path.resolve(directoryToEmpty)
-  log(`emptying directory: ${absolutePath}`)
+  trace(`emptying directory: ${absolutePath}`)
   if (!absolutePath.startsWith(process.cwd())) {
     throw new Error(`directoryToEmpty must be a child of the current working directory: ${directoryToEmpty}`)
   }
@@ -248,14 +260,14 @@ export async function emptyDirectory(directoryToEmpty: string, fileAndDirectoryN
 
   const dir = await fsp.opendir(directoryToEmpty, { encoding: 'utf-8' })
 
-  if (fileAndDirectoryNamesToSkip && !Array.isArray(fileAndDirectoryNamesToSkip)) {
+  if (mergedOptions.fileAndDirectoryNamesToSkip && !Array.isArray(mergedOptions.fileAndDirectoryNamesToSkip)) {
     throw new Error('fileAndDirectoryNamesToSkip must be an array')
   }
 
   let dirEntry = await dir.read()
 
   while (dirEntry) {
-    if (fileAndDirectoryNamesToSkip?.includes(dirEntry.name)) {
+    if (mergedOptions.fileAndDirectoryNamesToSkip?.includes(dirEntry.name)) {
       dirEntry = await dir.read()
       continue
     }
@@ -263,9 +275,9 @@ export async function emptyDirectory(directoryToEmpty: string, fileAndDirectoryN
     const direntPath = path.join(directoryToEmpty, dirEntry.name)
 
     if (dirEntry.isDirectory()) {
-      await fsp.rm(direntPath, { recursive: true })
+      await fsp.rm(direntPath, { recursive: true, force: mergedOptions.force })
     } else {
-      await fsp.unlink(direntPath)
+      await fsp.rm(direntPath, { force: mergedOptions.force })
     }
 
     dirEntry = await dir.read()
@@ -1054,7 +1066,7 @@ export async function isPortAvailable(port: number): Promise<boolean> {
 }
 
 /**
- * Returns the value for an environment variable or throws if it's undefined or null. Pass optional {@param throwOnEmpty} to throw when the key exists but has an empty value.
+ * Returns the value for an environment variable or throws if it's undefined or null. Pass optional `throwOnEmpty` param to throw when the key exists but has an empty value.
  * @param varName The name of the environment variable to get.
  * @param throwOnEmpty Throw an error if key exists (not undefined or null) but is empty.
  * @returns 
@@ -1069,23 +1081,6 @@ export function getRequiredEnvVar(varName: string, throwOnEmpty = true): string 
     throw new Error(`Required environment variable is empty: ${varName}`)
   }
   return val
-}
-
-/** Options for {@link withRetryAsync}. */
-export interface WithRetryOptions {
-  /**
-   * Number of milliseconds to wait before the first attempt.
-   */
-  initialDelayMilliseconds: number
-  /**
-   * Use this in log messages instead of the function name (useful for passing lambdas which would otherwise display as "anonymous").
-   */
-  functionLabel?: string
-  /**
-   * If NodeCliUtilsConfig.traceEnabled is `true` then messages will be logged even if this option is `false`.
-   * Set to `true` to log messages even if Node ]
-   */
-  traceEnabled: boolean
 }
 
 export function getNormalizedError(err: unknown): Error {
@@ -1108,8 +1103,29 @@ export function getNormalizedError(err: unknown): Error {
   return lastErrorAsError
 }
 
+/** Options for {@link withRetryAsync}. */
+export interface WithRetryOptions {
+  /**
+   * Number of milliseconds to wait before the first attempt.
+   */
+  initialDelayMilliseconds: number
+  /**
+   * Use this in log messages instead of the function name (useful for passing lambdas which would otherwise display as "anonymous").
+   */
+  functionLabel?: string
+  /**
+   * If NodeCliUtilsConfig.traceEnabled is `true` then messages will be logged even if this option is `false`.
+   * Set to `true` to log messages even if Node ]
+   */
+  traceEnabled: boolean
+  /**
+   * Log all errors rather than just the last one after all retries fail. If `true`, this setting overrides library trace and this method's traceEnabled option.
+   */
+  logIntermediateErrors: boolean
+}
+
 /**
- * Call a function until it succeeds. Will stop after the number of calls specified by {@param maxCalls}, or forever if -1 is passed.
+ * Call a function until it succeeds. Will stop after the number of calls specified by `maxCalls` param, or forever if -1 is passed.
  * @param func The function to call
  * @param maxCalls The maximum number of times to call the function before giving up. Pass -1 to retry forever.
  * @param delayMilliseconds The number of milliseconds to wait between calls
@@ -1120,7 +1136,7 @@ export async function withRetryAsync(func: () => Promise<void>, maxCalls: number
   let lastError: unknown
   const forever = maxCalls === -1
 
-  const defaultOptions: WithRetryOptions = { initialDelayMilliseconds: 0, traceEnabled: false }
+  const defaultOptions: WithRetryOptions = { initialDelayMilliseconds: 0, traceEnabled: false, logIntermediateErrors: false }
   const mergedOptions: WithRetryOptions = { ...defaultOptions, ...options }
 
   const shouldLog = config.traceEnabled || mergedOptions.traceEnabled
@@ -1141,7 +1157,7 @@ export async function withRetryAsync(func: () => Promise<void>, maxCalls: number
       retryLog(`attempt ${attemptNumber} was successful`)
       break
     } catch (err) {
-      if (shouldLog) {
+      if (mergedOptions.logIntermediateErrors || shouldLog) {
         console.error(err)
       }
       lastError = err
