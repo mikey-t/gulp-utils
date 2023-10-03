@@ -1,0 +1,1 @@
+This directory is used for output during tests. Only this file is not git ignored.

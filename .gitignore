@@ -1,4 +1,8 @@
 node_modules
 .idea
-scratch/release
-scratch/deploy/*
+dist
+.env
+**/docker/pg
+test/temp/*
+!test/temp/placeholder.txt
+coverage

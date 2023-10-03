@@ -1,0 +1,25 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "entryPoints": [
+    "src/index.ts",
+    "src/certUtils.ts",
+    "src/dotnetUtils.ts",
+    "src/dbMigrationUtils.ts",
+    "src/NodeCliUtilsConfig.ts",
+    "src/DependencyChecker.ts",
+    "src/hostFileUtils.ts",
+    "src/testUtils.ts"
+  ],
+  "out": "../node-cli-utils-docs/",
+  "cleanOutputDir": true,
+  "tsconfig": "./tsconfig.esm.json",
+  "excludeExternals": true,
+  "plugin": [
+    "typedoc-plugin-missing-exports"
+  ],
+  "visibilityFilters": {},
+  "searchInComments": true,
+  "navigationLinks": {
+    "GitHub: mikey-t/node-cli-utils": "https://github.com/mikey-t/node-cli-utils"
+  }
+}

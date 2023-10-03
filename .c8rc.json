@@ -1,0 +1,16 @@
+{
+    "reporter": [
+        "text",
+        "lcov"
+    ],
+    "all": true,
+    "include": [
+        "src/certUtils.ts",
+        "src/dbMigrationUtils.ts",
+        "src/dotnetUtils.ts",
+        "src/generalUtils.ts",
+        "src/generalUtilsInternal.ts",
+        "src/NodeCliUtilsConfig.ts",
+        "src/TarballUtility.ts"
+    ]
+}
