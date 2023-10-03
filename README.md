@@ -14,7 +14,7 @@ npm install @mikeyt23/node-cli-utils --save-dev
 
 ## Exported Modules
 
-Utility functions are loosely grouped into 4 modules:
+Utility functions are loosely grouped into the following sub-modules:
 
 | Module | Description |
 |--------|-------------|
@@ -22,10 +22,14 @@ Utility functions are loosely grouped into 4 modules:
 | @mikeyt23/node-cli-util/dbMigrationUtils  | DB migration utils (see [db-migrations-dotnet](https://github.com/mikey-t/db-migrations-dotnet)) |
 | @mikeyt23/node-cli-util/dotnetUtils | Dotnet utils |
 | @mikeyt23/node-cli-util/certUtils | Cert utils |
+| @mikeyt23/node-cli-util/colors | Utils methods to add color to CLI output |
+| @mikeyt23/node-cli-util/DependencyChecker | Util class for checking system dependencies |
+| @mikeyt23/node-cli-util/hostFileUtils | Host file utils |
+| @mikeyt23/node-cli-util/testUtils | Helper methods for use with the NodeJS test runner | 
 
 ## Reasoning
 
-NodeJS projects are out-of-control with the depth of their dependency trees. Rather than giving in to that trend, I'm attempting to maintain a small set of simple helper methods using built-in NodeJS functionality whenever possible, and only importing things when I simply can't easily reproduce the functionality myself. And when I do import a dependency, it will preferably be one with a shallow dependency tree.
+NodeJS projects are out-of-control with the depth of their dependency trees. Rather than giving in to that trend, I'm attempting to maintain a collection of utilities using only built-in NodeJS functionality whenever possible, and only importing things when I simply can't easily reproduce the functionality myself. And when I do import a dependency, it will preferably be one with a shallow dependency tree.
 
 In some ways this is bad because I'm obviously re-inventing the wheel and there's other libraries that do some of this stuff way better. But here's what I'm getting by doing it this way:
 
@@ -37,6 +41,14 @@ In some ways this is bad because I'm obviously re-inventing the wheel and there'
 Originally I made an exception to this rule for [node-tar](https://github.com/isaacs/node-tar). However, I replaced this with a system call to the OS built-in `tar` utility since even Windows has this built-in since 2018.
 
 Also - just my personal opinion - every serious developer should create and maintain libraries like this. It's not always about reinventing the wheel or not. Sometimes it's about learning about different types of wheels by creating some yourself.
+
+Why one big package instead of smaller targeted packages? Smaller more focused packages would indeed be better, but only if I actually had time to maintain them all, which I don't. That decision will inevitably make this package a poor choice for most people for many reasons, but the benefit drastically outweighs the cost, in my opinion.
+
+## Semver
+
+I won't be adhering to strict semver. I chose to group a large number of unrelated things into a single project so that I don't have to spend all my time maintaining many small projects. As a result, I probably won't be able to realistically bump minor/major versions every time there is a method signature change in a single function, for example.
+
+However, I plan on keeping the project well-documented and I also plan on continuing to increase unit test coverage, so hopefully the downsides of my approach will be somewhat mitigated.
 
 ## Noteworthy Features
 
@@ -57,9 +69,3 @@ So normally you can do one of a couple things so that your process spawning code
 Instead I've chosen to create a couple of different wrapper methods for Node's spawn method. One calls spawn fairly normally (`spawnAsync` in [./src/generalUtils.ts](./src/generalUtils.ts)), with an additional option to get the exec-like functionality of throwing on non-zero return code if you want. And another wrapper that is used for long running processes that uses the shell option, but if you're on windows does a nifty little hack to spawn a "middle" watchdog process that polls for whether the parent is alive or not and kills the child process tree if it becomes orphaned (`spawnAsyncLongRunning` in [./src/generalUtils.ts](./src/generalUtils.ts)).
 
 In the future I may go research how others have solved cross-platform process spawning, but for now this little hack works fine.
-
-## TODO
-
-- More unit tests
-- Build out example projects that use both CommonJS and ESM
-- Move the DB migration utils out of this library into it's own space
