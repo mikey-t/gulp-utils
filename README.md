@@ -4,7 +4,11 @@ This library is a collection of miscellaneous utility functions for Node CLI scr
 
 I primarily use this library with [swig-cli](https://github.com/mikey-t/swig) to automate project dev tasks and generally to glue all the things together. Check out an example project that uses both swig-cli and node-cli-utils: [dotnet-react-sandbox](https://github.com/mikey-t/dotnet-react-sandbox).
 
-The auto-generated portion of this project's documentation is auto-generated from JSDoc using [TypeDoc](https://github.com/TypeStrong/typedoc).
+## Documentation
+
+Auto-generated TypeDoc documentation: [https://mikey-t.github.io/node-cli-utils-docs/](https://mikey-t.github.io/node-cli-utils-docs/).
+
+Generated with [TypeDoc](https://github.com/TypeStrong/typedoc).
 
 ## Install
 

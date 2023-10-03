@@ -149,3 +149,8 @@ Misc notes on SonarQube setup:
     - I wanted to define both services in a single docker compose so that the scanner can reference the server URL by docker service name, but I don't actually want both of them to run at the same time when running "docker compose up". Setting a profile on the scanner makes it so it doesn't start unless that profile flag is passed, or if the run command is called directly.
 - Scanner run time was incredibly slow (5 minutes) until I set the `sonar.working.directory` to a directory within the docker container and then it runs in a reasonable amount of time (26 seconds). The relevant docker-compose.yml entry: `command: sh -c "mkdir -p /tmp/sonar-scanner && sonar-scanner -Dsonar.working.directory=/tmp/sonar-scanner"`
 
+## Updating API Docs
+
+- Ensure `typedoc.json` is up to date and has any new entry points
+- Run: `swig genDocs`
+- Commit and push the other repository these files get dumped into [node-cli-utils-docs](https://github.com/mikey-t/node-cli-utils-docs)
