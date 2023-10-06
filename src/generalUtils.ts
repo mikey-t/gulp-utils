@@ -1,4 +1,4 @@
-import { SpawnOptions } from 'node:child_process'
+import { SpawnOptions, execSync } from 'node:child_process'
 import fs from 'node:fs'
 import fsp from 'node:fs/promises'
 import { platform } from 'node:os'
@@ -6,7 +6,7 @@ import path, { resolve } from 'node:path'
 import * as readline from 'readline'
 import * as net from 'net'
 import { config } from './NodeCliUtilsConfig.js'
-import { SpawnOptionsInternal, copyEnv, dictionaryToEnvFileString, getEnvAsDictionary, simpleSpawnAsyncInternal, simpleSpawnSyncInternal, spawnAsyncInternal, validateFindFilesRecursivelyParams, whichInternal } from './generalUtilsInternal.js'
+import { SpawnOptionsInternal, copyEnv, dictionaryToEnvFileString, getEnvAsDictionary, simpleSpawnAsyncInternal, simpleSpawnSyncInternal, spawnAsyncInternal, throwIfDockerNotReady, validateFindFilesRecursivelyParams, whichInternal } from './generalUtilsInternal.js'
 
 // For JSDoc links
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -716,13 +716,14 @@ export async function isDockerRunning(): Promise<boolean> {
  * 
  * Notes on docker startup command:
  * - May require entering a password
- * - On Windows with Docker Desktop it will run `Start-Process "C:\Program Files\Docker\Docker\Docker Desktop.exe"`
- * - On Windows without Docker Desktop it will run `wsl -u root -e sh -c "service docker start"`
- * - On Linux it will run `sudo systemctl start docker`
+ * - On Windows with Docker Desktop and from within powershell or cmd it will run in powershell: `Start-Process "C:\Program Files\Docker\Docker\Docker Desktop.exe" -NoNewWindow`
+ * - On Windows without Docker Desktop from within powershell or cmd it will run: `sudo service docker start`
+ * - On Linux (including WSL) it will run: `sudo systemctl start docker`
  * - Not currently supported on Mac
+ * - If you're on Windows and have Docker Desktop but it is stopped and you're in a WSL shell, docker will appear as if it's not installed and this method will throw
  * 
  * @throws An {@link Error} If docker is not detected on the system.
- * @throws An {@link Error} if docker is detected as installed and not running but the system is not Windows or Linux.
+ * @throws An {@link Error} if docker is detected as installed and not running but the OS is Mac.
  */
 export async function ensureDockerRunning(): Promise<void> {
   if (!await isDockerInstalled()) {
@@ -734,27 +735,42 @@ export async function ensureDockerRunning(): Promise<void> {
   }
 
   let command: string
-  let args: string[]
+  let args: string[] = []
+  const isWindows = isPlatformWindows()
+  const isLinux = isPlatformLinux()
+  const dockerDesktopPath = 'C:\\Program Files\\Docker\\Docker\\Docker Desktop.exe'
+  let useExec = false
 
-  if (isPlatformWindows()) {
-    if (!(await which('docker')).location) {
-      command = 'wsl'
-      args = ['-u', 'root', '-e', 'sh', '-c', '"service docker start"']
-    } else {
+  if (isWindows) {
+    if (fs.existsSync(dockerDesktopPath)) {
       command = 'powershell'
-      args = getPowershellHackArgs(`Start-Process "C:\\Program Files\\Docker\\Docker\\Docker Desktop.exe"`)
+      args = getPowershellHackArgs(`Start-Process 'C:\\Program Files\\Docker\\Docker\\Docker Desktop.exe' -NoNewWindow`)
+    } else {
+      command = 'C:\\windows\\system32\\wsl.exe -u root -e sh -c "service docker start"'
+      useExec = true
     }
-  } else if (isPlatformLinux()) {
+  } else if (isLinux) {
     command = 'sudo'
-    args = ['systemctl', 'start', 'docker']
+    args = ['service', 'docker', 'start']
   } else {
     throw new Error('Starting docker within ensureDockerRunning is only supported on Windows and Linux - you will have to start docker manually')
   }
 
-  const result = await spawnAsync(command, args)
-  if (result.code !== 0) {
-    throw new Error('Unable to start docker - see error above')
+  if (useExec) {
+    try {
+      execSync(command, { stdio: 'inherit' })
+    } catch (err) {
+      throw new ExtendedError('Unable to start docker', getNormalizedError(err))
+    }
+  } else {
+    const result = await spawnAsync(command, args, { shell: isWindows })
+    if (result.code !== 0) {
+      throw new Error('Unable to start docker - see error above')
+    }
   }
+
+  // Wait for docker to be up and ready before continuing
+  await withRetryAsync(throwIfDockerNotReady, 6, 3000, { initialDelayMilliseconds: 3000 })
 }
 
 /**

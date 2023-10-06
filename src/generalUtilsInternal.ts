@@ -3,7 +3,7 @@ import fs from 'node:fs'
 import fsp from 'node:fs/promises'
 import path from 'node:path'
 import { config } from './NodeCliUtilsConfig.js'
-import { SimpleSpawnError, SimpleSpawnResult, SpawnError, SpawnOptionsWithThrow, SpawnResult, StringKeyedDictionary, WhichResult, isPlatformWindows, log, requireString, requireValidPath, sortDictionaryByKeyAsc, spawnAsync, stringToNonEmptyLines, stripShellMetaCharacters, trace } from './generalUtils.js'
+import { SimpleSpawnError, SimpleSpawnResult, SpawnError, SpawnOptionsWithThrow, SpawnResult, StringKeyedDictionary, WhichResult, isPlatformWindows, log, requireString, requireValidPath, simpleSpawnAsync, sortDictionaryByKeyAsc, spawnAsync, stringToNonEmptyLines, stripShellMetaCharacters, trace } from './generalUtils.js'
 
 const isCommonJS = typeof require === "function" && typeof module === "object" && module.exports
 const isEsm = !isCommonJS
@@ -337,5 +337,13 @@ export function whichInternal(commandName: string, simpleCmd: SimpleSpawnFunctio
       additionalLocations: undefined,
       error: err as Error
     }
+  }
+}
+
+export async function throwIfDockerNotReady() {
+  if (isPlatformWindows()) {
+    await simpleSpawnAsync('wsl', ['docker', 'info'])
+  } else {
+    await simpleSpawnAsync('docker', ['info'])
   }
 }

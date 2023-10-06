@@ -1,8 +1,11 @@
 import 'dotenv/config'
-import { emptyDirectory, isPlatformWindows, log, spawnAsync, spawnAsyncLongRunning, spawnDockerCompose } from './src/generalUtils.js'
+import { emptyDirectory, ensureDockerRunning, isPlatformWindows, log, spawnAsync, spawnAsyncLongRunning, spawnDockerCompose } from './src/generalUtils.js'
 import { series, parallel } from 'swig-cli'
 import fsp from 'node:fs/promises'
 import { config } from './src/NodeCliUtilsConfig.js'
+import { swigDockerConfig } from 'swig-cli-modules/config'
+import * as swigDocker from 'swig-cli-modules/DockerCompose'
+
 
 config.traceEnabled = false
 config.useWslPrefixForDockerCommands = isPlatformWindows()
@@ -22,7 +25,7 @@ const testFiles = [
 const adminTestFiles = [
   './test/certUtils.test.ts' // Note that these tests only currently work on windows and are quite slow
 ]
-const dockerComposePath = './docker-compose.yml'
+swigDockerConfig.dockerComposePath = './docker-compose.yml'
 
 export const build = series(cleanDist, parallel(buildEsm, series(buildCjs, copyCjsPackageJson)))
 export const buildEsmOnly = series(cleanDist, buildEsm)
@@ -89,27 +92,16 @@ export async function cleanDist() {
   await emptyDirectory('./dist')
 }
 
-export async function dockerUp() {
-  await printSonarQubeStartupMessage()
-  await spawnDockerCompose(dockerComposePath, 'up')
-}
+export const dockerUp = series(ensureDockerRunning, swigDocker.dockerUp, printSonarQubeStartupMessage)
+export const dockerUpAttached = series(ensureDockerRunning, swigDocker.dockerUpAttached, printSonarQubeStartupMessage)
+export const dockerDown = series(ensureDockerRunning, swigDocker.dockerDown, printSonarQubeStartupMessage)
 
-export async function dockerUpAttached() {
-  await printSonarQubeStartupMessage()
-  await spawnDockerCompose(dockerComposePath, 'up', { attached: true })
-}
-
-export async function dockerDown() {
-  await spawnDockerCompose(dockerComposePath, 'down')
-}
-
+// First run "swig dockerUp" and wait at least 10 seconds for sonar web app to finish initializing
 export async function scan() {
-  await spawnDockerCompose(dockerComposePath, 'run', { args: ['sonar-scanner'], attached: true })
+  await spawnDockerCompose(swigDockerConfig.dockerComposePath, 'run', { args: ['sonar-scanner'], attached: true })
 }
 
-export async function bashIntoSonar() {
-  await spawnDockerCompose(dockerComposePath, 'exec', { args: ['-it', 'sonarqube', 'bash'], attached: true })
-}
+export const bashIntoSonar = () => swigDocker.bashIntoContainer('sonarqube')
 
 export async function watchEsm() {
   await spawnAsyncLongRunning('node', [tscPath, '--p', 'tsconfig.esm.json', '--watch'])

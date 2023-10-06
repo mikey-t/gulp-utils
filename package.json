@@ -1,6 +1,6 @@
 {
   "name": "@mikeyt23/node-cli-utils",
-  "version": "2.0.2",
+  "version": "2.0.3",
   "description": "Some node cli utility functions",
   "author": "Mike Thompson",
   "license": "MIT",
@@ -103,6 +103,7 @@
     "c8": "^8.0.1",
     "dotenv": "^16.3.1",
     "eslint": "^8.49.0",
+    "swig-cli-modules": "^0.0.4",
     "ts-node": "^10.9.1",
     "tsx": "^3.12.10",
     "typedoc": "^0.25.1",
