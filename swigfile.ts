@@ -1,10 +1,11 @@
 import 'dotenv/config'
-import { emptyDirectory, log, spawnAsync, spawnAsyncLongRunning, spawnDockerCompose } from './src/generalUtils.js'
+import { emptyDirectory, isPlatformWindows, log, spawnAsync, spawnAsyncLongRunning, spawnDockerCompose } from './src/generalUtils.js'
 import { series, parallel } from 'swig-cli'
 import fsp from 'node:fs/promises'
 import { config } from './src/NodeCliUtilsConfig.js'
 
 config.traceEnabled = false
+config.useWslPrefixForDockerCommands = isPlatformWindows()
 
 // Using direct paths to node_modules to skip the startup delay of using npm
 const tscPath = './node_modules/typescript/lib/tsc.js'

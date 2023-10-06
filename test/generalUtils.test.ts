@@ -1,5 +1,5 @@
 import { describe, it } from 'node:test'
-import { humanizeTime, requireString, which, whichSync } from '../src/generalUtils.js'
+import { humanizeTime, requireString, toWslPath, which, whichSync } from '../src/generalUtils.js'
 import assert from 'node:assert'
 import { assertErrorMessageEquals, assertErrorMessageStartsWith } from '../src/testUtils.js'
 
@@ -89,5 +89,55 @@ describe('whichSync', () => {
   })
   it('does not allow shell metacharacters', () => {
     assert.throws(() => whichSync('node; echo "hello"'), err => assertErrorMessageStartsWith(err, `commandName cannot contain shell meta characters`))
+  })
+})
+
+describe('toWslPath', () => {
+  it('converts a windows path to a wsl path', () => {
+    const winPath = 'C:\\the\\PaTh\\iN\\winDows'
+    const expected = '/mnt/c/the/PaTh/iN/winDows'
+    const wslPath = toWslPath(winPath)
+    assert.strictEqual(wslPath, expected)
+  })
+  it('uses the drive letter in the converted path', () => {
+    const winPath = 'D:\\the\\PaTh\\iN\\winDows'
+    const expected = '/mnt/d/the/PaTh/iN/winDows'
+    const wslPath = toWslPath(winPath)
+    assert.strictEqual(wslPath, expected)
+  })
+  it('returns the input unchanged if path is not absolute', () => {
+    const winPath = '.\\somethingRelative'
+    const wslPath = toWslPath(winPath)
+    assert.strictEqual(wslPath, winPath)
+  })
+  it('single quotes paths with spaces in it', () => {
+    const winPath = 'C:\\a\\path with\\spaces'
+    const expected = `'/mnt/c/a/path with/spaces'`
+    const wslPath = toWslPath(winPath)
+    assert.strictEqual(wslPath, expected)
+  })
+  it('double quotes paths with spaces and single quotes in it', () => {
+    const winPath = `C:\\a\\path with\\spaces\\and'single'quotes`
+    const expected = `"/mnt/c/a/path with/spaces/and'single'quotes"`
+    const wslPath = toWslPath(winPath)
+    assert.strictEqual(wslPath, expected)
+  })
+  it('double quotes paths with single quotes and no spaces in it', () => {
+    const winPath = `C:\\a\\path\\without\\spaces\\and'single'quotes`
+    const expected = `"/mnt/c/a/path/without/spaces/and'single'quotes"`
+    const wslPath = toWslPath(winPath)
+    assert.strictEqual(wslPath, expected)
+  })
+  it('does not single quotes paths with spaces in it if quote option set to false', () => {
+    const winPath = 'C:\\a\\path with\\spaces'
+    const expected = '/mnt/c/a/path with/spaces'
+    const wslPath = toWslPath(winPath, false)
+    assert.strictEqual(wslPath, expected)
+  })
+  it('does not double quote paths with spaces and single quotes in it if quote option is set to false', () => {
+    const winPath = `C:\\a\\path with\\spaces\\and'single'quotes`
+    const expected = `/mnt/c/a/path with/spaces/and'single'quotes`
+    const wslPath = toWslPath(winPath, false)
+    assert.strictEqual(wslPath, expected)
   })
 })

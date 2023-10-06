@@ -394,6 +394,10 @@ export interface DockerComposeOptions {
   /**
   * If not provided, it will default to using the directory that the docker-compose.yml is located in.
   * Specifies what current working directory to use with the spawn command.
+  * 
+  * **Important:**: this only affects the current working directory of the spawned process itself. The docker command will still only pull in env values from a `.env`
+  * file in the same directory as the docker-compose.yml, NOT the cwd passed here. If a different `.env` file path is needed, use the {@link altEnvFilePath} option. If
+  * you use the {@link altEnvFilePath} option with a relative path, ensure that it is relative to the current working directory passed with this option.
   */
   cwd?: string
 
@@ -420,6 +424,19 @@ export interface DockerComposeOptions {
    * See https://docs.docker.com/compose/profiles/.
    */
   profile?: string
+
+  /**
+   * The option `useWslPrefix` set to `true` can be used If Docker Desktop is not installed on Windows and docker commands need to execute via wsl.
+   */
+  useWslPrefix?: boolean
+
+  /**
+   * Specify an alternative env file. This is useful since docker will normally only use a `.env` file in the same directory as the docker-compose.yml file,
+   * regardless of the current working directory of the running command. This path will be passed to docker compose using the `--env-file` option.
+   * 
+   * **Important:** if using a relative path, be sure pass the appropriate value for {@link cwd} to this method so that the relative path can correctly be resolved.
+   */
+  altEnvFilePath?: string
 }
 
 /**
@@ -439,6 +456,9 @@ export async function spawnDockerCompose(dockerComposePath: string, dockerCompos
   if (options?.cwd) {
     requireValidPath('cwd', options.cwd)
   }
+  if (options?.altEnvFilePath) {
+    requireValidPath('altEnvFilePath', options.altEnvFilePath)
+  }
   if (options?.projectName && !isDockerComposeProjectNameValid(options.projectName)) {
     throw new Error('Invalid docker compose project name specified for the projectName param. Project names must contain only lowercase letters, decimal digits, dashes, and underscores, and must begin with a lowercase letter or decimal digit.')
   }
@@ -451,6 +471,9 @@ export async function spawnDockerCompose(dockerComposePath: string, dockerCompos
 
   const defaultOptions: DockerComposeOptions = { args: [], attached: false, projectName: undefined, cwd: undefined }
   const mergedOptions = { ...defaultOptions, ...options }
+  if (!options || options.useWslPrefix === undefined) {
+    mergedOptions.useWslPrefix = config.useWslPrefixForDockerCommands
+  }
 
   const dockerComposeDir = path.dirname(dockerComposePath)
   const dockerComposeFilename = path.basename(dockerComposePath)
@@ -459,7 +482,12 @@ export async function spawnDockerCompose(dockerComposePath: string, dockerCompos
     mergedOptions.cwd = dockerComposeDir
   }
 
-  let spawnArgs = ['compose', '-f', mergedOptions.cwd ? path.resolve(dockerComposePath) : dockerComposeFilename]
+  let dockerComposePathResolved = mergedOptions.cwd ? path.resolve(dockerComposePath) : dockerComposeFilename
+  if (mergedOptions.useWslPrefix) {
+    dockerComposePathResolved = toWslPath(dockerComposePathResolved)
+  }
+
+  let spawnArgs = ['compose', '-f', dockerComposePathResolved]
 
   if (mergedOptions.projectName) {
     spawnArgs.push('--project-name', mergedOptions.projectName)
@@ -467,6 +495,10 @@ export async function spawnDockerCompose(dockerComposePath: string, dockerCompos
 
   if (mergedOptions.profile) {
     spawnArgs.push('--profile', mergedOptions.profile)
+  }
+
+  if (mergedOptions.altEnvFilePath) {
+    spawnArgs.push('--env-file', mergedOptions.useWslPrefix ? toWslPath(mergedOptions.altEnvFilePath) : mergedOptions.altEnvFilePath)
   }
 
   spawnArgs.push(dockerComposeCommand)
@@ -483,7 +515,7 @@ export async function spawnDockerCompose(dockerComposePath: string, dockerCompos
 
   const longRunning = dockerComposeCommandsThatSupportDetached.includes(dockerComposeCommand) && options?.attached === true
 
-  trace(`docker compose command will be configured to use long running options: ${longRunning}`)
+  trace(`docker compose command will be configured to use long running option: ${longRunning}`)
 
   const spawnOptions: Partial<SpawnOptionsInternal> = {
     cwd: mergedOptions.cwd,
@@ -491,7 +523,9 @@ export async function spawnDockerCompose(dockerComposePath: string, dockerCompos
     isLongRunning: longRunning
   }
 
-  const spawnResult = await spawnAsyncInternal('docker', spawnArgs, spawnOptions)
+  const spawnResult = mergedOptions.useWslPrefix ?
+    await spawnAsyncInternal('wsl', ['docker', ...spawnArgs], spawnOptions) :
+    await spawnAsyncInternal('docker', spawnArgs, spawnOptions)
 
   if (spawnResult.code !== 0) {
     throw new Error(`docker compose command failed with code ${spawnResult.code}`)
@@ -646,21 +680,80 @@ export function whichSync(commandName: string): WhichResult {
 }
 
 /**
- * First checks if docker is installed and if not immediately returns false. Then runs the `docker info`
- * command and looks for "error during connect" in the output to determine if docker is running.
+ * Uses {@link which} to determine if docker is installed. If the `which` call doesn't find docker and the platform
+ * is Windows, then this will check the output of `wsl docker --version` to see if just the engine is installed.
+ * @returns `true` if docker is installed, `false` otherwise
+ */
+export async function isDockerInstalled(): Promise<boolean> {
+  if ((await which('docker')).location) {
+    return true
+  }
+  if (isPlatformWindows()) {
+    const result = await simpleSpawnAsync('wsl', ['docker', '--version'])
+    return result.code === 0
+  }
+  return false
+}
+
+/**
+ * Runs the `docker info` command and looks for "error during connect" in the output to determine if docker is running. If you
+ * want to check if docker is installed, use {@link isDockerInstalled}.
  * @returns `true` if docker is installed and running, `false` otherwise
  */
 export async function isDockerRunning(): Promise<boolean> {
-  if (!whichSync('docker').location) {
-    trace('whichSync will not check if docker is running because docker does not appear to be installed - returning false')
-    return false
-  }
-
   try {
-    const result = await simpleSpawnAsync('docker', ['info'])
-    return !result.stdout.includes('error during connect')
+    const result = isPlatformWindows() ?
+      await simpleSpawnAsync('wsl', ['docker', 'info']) :
+      await simpleSpawnAsync('docker', ['info'])
+    return result.code === 0 && !result.stdout.includes('error during connect')
   } catch (err) {
     return false
+  }
+}
+
+/**
+ * Attempt to start the docker service if it isn't running. Whether it's running is determined by a call to {@link isDockerRunning}.
+ * 
+ * Notes on docker startup command:
+ * - May require entering a password
+ * - On Windows with Docker Desktop it will run `Start-Process "C:\Program Files\Docker\Docker\Docker Desktop.exe"`
+ * - On Windows without Docker Desktop it will run `wsl -u root -e sh -c "service docker start"`
+ * - On Linux it will run `sudo systemctl start docker`
+ * - Not currently supported on Mac
+ * 
+ * @throws An {@link Error} If docker is not detected on the system.
+ * @throws An {@link Error} if docker is detected as installed and not running but the system is not Windows or Linux.
+ */
+export async function ensureDockerRunning(): Promise<void> {
+  if (!await isDockerInstalled()) {
+    throw new Error('Docker does not appear to be installed')
+  }
+
+  if (await isDockerRunning()) {
+    return
+  }
+
+  let command: string
+  let args: string[]
+
+  if (isPlatformWindows()) {
+    if (!(await which('docker')).location) {
+      command = 'wsl'
+      args = ['-u', 'root', '-e', 'sh', '-c', '"service docker start"']
+    } else {
+      command = 'powershell'
+      args = getPowershellHackArgs(`Start-Process "C:\\Program Files\\Docker\\Docker\\Docker Desktop.exe"`)
+    }
+  } else if (isPlatformLinux()) {
+    command = 'sudo'
+    args = ['systemctl', 'start', 'docker']
+  } else {
+    throw new Error('Starting docker within ensureDockerRunning is only supported on Windows and Linux - you will have to start docker manually')
+  }
+
+  const result = await spawnAsync(command, args)
+  if (result.code !== 0) {
+    throw new Error('Unable to start docker - see error above')
   }
 }
 
@@ -1229,3 +1322,37 @@ export enum Emoji {
   Key = '🔑',
 }
 
+/**
+ * Converts a windows path to a WSL path (Windows Subsystem for Linux) if it's an absolute path, otherwise returns it unchanged.
+ * 
+ * Normally you can use `path.resolve()` to convert paths to whatever is appropriate for the OS, but if you're running on Windows and need to spawn a
+ * command with `wsl yourCommand`, then you'll want to use this function to convert any parameters that are paths so that they can be resolved within WSL.
+ * Because the intended use of this function is for passing params around, most use cases will also require paths with spaces or single quotes to be
+ * wrapped in quotes, so `wrapInQuotesIfSpaces` defaults to true.
+ * @param winPath The Windows path.
+ * @param wrapInQuotesIfSpaces Defaults to `true`. If `true` and the `winPath` passed has spaces, the returned string will be wrapped in quotes.
+ * Single quotes will be used unless there are single quote characters within the path, in which case it will be wrapped in double quotes.
+ * @returns The wsl equivalent path.
+ */
+export function toWslPath(winPath: string, wrapInQuotesIfSpaces: boolean = true): string {
+  if (!path.isAbsolute(winPath)) {
+    return winPath
+  }
+  const drive = winPath.charAt(0).toLowerCase()
+  const remainingPath = winPath.substring(2).replace(/\\/g, '/').replace(/\/{2,}/g, '/')
+  const wslPath = path.posix.join(`/mnt/${drive}`, remainingPath)
+
+  if (!wrapInQuotesIfSpaces) {
+    return wslPath
+  }
+
+  if (wslPath.includes("'")) {
+    return `"${wslPath}"`
+  }
+
+  if (wslPath.includes(' ')) {
+    return `'${wslPath}'`
+  }
+
+  return wslPath
+}
