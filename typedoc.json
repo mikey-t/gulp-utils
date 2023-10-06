@@ -10,7 +10,7 @@
     "src/hostFileUtils.ts",
     "src/testUtils.ts"
   ],
-  "out": "../node-cli-utils-docs/",
+  "out": "../node-cli-utils-docs/docs",
   "cleanOutputDir": true,
   "tsconfig": "./tsconfig.esm.json",
   "excludeExternals": true,
