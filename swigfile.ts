@@ -107,6 +107,8 @@ export async function watchEsm() {
   await spawnAsyncLongRunning('node', [tscPath, '--p', 'tsconfig.esm.json', '--watch'])
 }
 
+export const npmPublish = series(build, genDocs, ['npmPublish', () => spawnAsync('npm', ['publish'])])
+
 async function buildEsm() {
   log('Building ESM')
   await spawnAsync('node', [tscPath, '--p', 'tsconfig.esm.json'], { throwOnNonZero: true })
