@@ -21,5 +21,6 @@
   "searchInComments": true,
   "navigationLinks": {
     "GitHub: mikey-t/node-cli-utils": "https://github.com/mikey-t/node-cli-utils"
-  }
+  },
+  "cacheBust": true
 }

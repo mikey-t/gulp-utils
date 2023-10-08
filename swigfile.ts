@@ -110,7 +110,12 @@ export async function watchEsm() {
 export const publish = series(
   lint,
   build,
-  ['npmPublish', () => spawnAsync('npm', ['publish'], { throwOnNonZero: true })],
+  ['npmPublish', () => spawnAsync('npm', ['publish'], { throwOnNonZero: true })]
+)
+
+export const publishDocs = series(
+  lint,
+  build,
   genDocs,
   ['publishDocs', () => spawnAsync('swig', ['publish'], { throwOnNonZero: true, cwd: '../node-cli-utils-docs' })]
 )
