@@ -1372,3 +1372,26 @@ export function toWslPath(winPath: string, wrapInQuotesIfSpaces: boolean = true)
 
   return wslPath
 }
+
+export function classToJson(instance: object) {
+  const jsonObj: { [key: string]: unknown } = {}
+
+  // Include public fields
+  for (const [key, value] of Object.entries(instance)) {
+    if (!key.startsWith('_')) {
+      jsonObj[key] = value
+    }
+  }
+
+  // Include fields with getters
+  const proto = Object.getPrototypeOf(instance)
+  for (const key of Object.getOwnPropertyNames(proto)) {
+    if (key.startsWith('_')) continue
+    const desc = Object.getOwnPropertyDescriptor(proto, key)
+    const hasGetter = desc && typeof desc.get === 'function'
+    if (hasGetter) {
+      jsonObj[key] = (instance as Record<string, unknown>)[key]
+    }
+  }
+  return jsonObj
+}

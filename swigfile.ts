@@ -96,7 +96,7 @@ export const dockerUp = series(ensureDockerRunning, swigDocker.dockerUp, printSo
 export const dockerUpAttached = series(ensureDockerRunning, swigDocker.dockerUpAttached, printSonarQubeStartupMessage)
 export const dockerDown = series(ensureDockerRunning, swigDocker.dockerDown, printSonarQubeStartupMessage)
 
-// First run "swig dockerUp" and wait at least 10 seconds for sonar web app to finish initializing
+// First run "swig dockerUp" and wait at least 10 seconds for the sonar web app to finish initializing
 export async function scan() {
   await spawnDockerCompose(swigDockerConfig.dockerComposePath, 'run', { args: ['sonar-scanner'], attached: true })
 }
@@ -107,10 +107,12 @@ export async function watchEsm() {
   await spawnAsyncLongRunning('node', [tscPath, '--p', 'tsconfig.esm.json', '--watch'])
 }
 
-export const npmPublish = series(
+export const publish = series(
+  lint,
   build,
-  ['npmPublish', () => spawnAsync('npm', ['publish'])],
-  genDocs
+  ['npmPublish', () => spawnAsync('npm', ['publish'], { throwOnNonZero: true })],
+  genDocs,
+  ['publishDocs', () => spawnAsync('swig', ['publish'], { throwOnNonZero: true, cwd: '../node-cli-utils-docs' })]
 )
 
 async function buildEsm() {
