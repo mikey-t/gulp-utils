@@ -1,6 +1,6 @@
 {
   "name": "@mikeyt23/node-cli-utils",
-  "version": "2.0.6",
+  "version": "2.0.7",
   "description": "Some node cli utility functions",
   "author": "Mike Thompson",
   "license": "MIT",
@@ -25,59 +25,83 @@
         "default": "./dist/cjs/index.js"
       }
     },
+    "./dockerUtils": {
+      "import": {
+        "types": "./dist/esm/dockerUtils.d.ts",
+        "default": "./dist/esm/dockerUtils.js"
+      },
+      "require": {
+        "types": "./dist/cjs/dockerUtils.d.ts",
+        "default": "./dist/cjs/dockerUtils.js"
+      }
+    },
     "./certUtils": {
       "import": {
+        "types": "./dist/esm/certUtils.d.ts",
         "default": "./dist/esm/certUtils.js"
       },
       "require": {
+        "types": "./dist/cjs/certUtils.d.ts",
         "default": "./dist/cjs/certUtils.js"
       }
     },
     "./dotnetUtils": {
       "import": {
+        "types": "./dist/esm/dotnetUtils.d.ts",
         "default": "./dist/esm/dotnetUtils.js"
       },
       "require": {
+        "types": "./dist/cjs/dotnetUtils.d.ts",
         "default": "./dist/cjs/dotnetUtils.js"
       }
     },
     "./dbMigrationUtils": {
       "import": {
+        "types": "./dist/esm/dbMigrationUtils.d.ts",
         "default": "./dist/esm/dbMigrationUtils.js"
       },
       "require": {
+        "types": "./dist/cjs/dbMigrationUtils.d.ts",
         "default": "./dist/cjs/dbMigrationUtils.js"
       }
     },
     "./colors": {
       "import": {
+        "types": "./dist/esm/colors.d.ts",
         "default": "./dist/esm/colors.js"
       },
       "require": {
+        "types": "./dist/cjs/colors.d.ts",
         "default": "./dist/cjs/colors.js"
       }
     },
     "./DependencyChecker": {
       "import": {
+        "types": "./dist/esm/DependencyChecker.d.ts",
         "default": "./dist/esm/DependencyChecker.js"
       },
       "require": {
+        "types": "./dist/cjs/DependencyChecker.d.ts",
         "default": "./dist/cjs/DependencyChecker.js"
       }
     },
     "./hostFileUtils": {
       "import": {
+        "types": "./dist/esm/hostFileUtils.d.ts",
         "default": "./dist/esm/hostFileUtils.js"
       },
       "require": {
+        "types": "./dist/cjs/hostFileUtils.d.ts",
         "default": "./dist/cjs/hostFileUtils.js"
       }
     },
     "./testUtils": {
       "import": {
+        "types": "./dist/esm/testUtils.d.ts",
         "default": "./dist/esm/testUtils.js"
       },
       "require": {
+        "types": "./dist/cjs/testUtils.d.ts",
         "default": "./dist/cjs/testUtils.js"
       }
     }
@@ -103,7 +127,6 @@
     "c8": "^8.0.1",
     "dotenv": "^16.3.1",
     "eslint": "^8.49.0",
-    "swig-cli-modules": "^0.0.4",
     "ts-node": "^10.9.1",
     "tsx": "^3.12.10",
     "typedoc": "^0.25.1",

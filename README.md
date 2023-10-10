@@ -13,23 +13,24 @@ Generated with [TypeDoc](https://github.com/TypeStrong/typedoc).
 ## Install
 
 ```
-npm install @mikeyt23/node-cli-utils --save-dev
+npm i -D @mikeyt23/node-cli-utils
 ```
 
 ## Exported Modules
 
-Utility functions are loosely grouped into the following sub-modules:
+Utility functions are grouped into the following sub-modules:
 
 | Module | Description |
 |--------|-------------|
-| @mikeyt23/node-cli-util | General utils |
-| @mikeyt23/node-cli-util/dbMigrationUtils  | DB migration utils (see [db-migrations-dotnet](https://github.com/mikey-t/db-migrations-dotnet)) |
-| @mikeyt23/node-cli-util/dotnetUtils | Dotnet utils |
-| @mikeyt23/node-cli-util/certUtils | Cert utils |
-| @mikeyt23/node-cli-util/colors | Utils methods to add color to CLI output |
-| @mikeyt23/node-cli-util/DependencyChecker | Util class for checking system dependencies |
-| @mikeyt23/node-cli-util/hostFileUtils | Host file utils |
-| @mikeyt23/node-cli-util/testUtils | Helper methods for use with the NodeJS test runner | 
+| @mikeyt23/node-cli-utils | General utils |
+| @mikeyt23/node-cli-utils/dockerUtils | Docker utils |
+| @mikeyt23/node-cli-utils/dbMigrationUtils  | DB migration utils (see [db-migrations-dotnet](https://github.com/mikey-t/db-migrations-dotnet)) |
+| @mikeyt23/node-cli-utils/dotnetUtils | Dotnet utils |
+| @mikeyt23/node-cli-utils/certUtils | Cert utils |
+| @mikeyt23/node-cli-utils/colors | Utils methods to add color to CLI output |
+| @mikeyt23/node-cli-utils/DependencyChecker | Util class for checking system dependencies |
+| @mikeyt23/node-cli-utils/hostFileUtils | Host file utils |
+| @mikeyt23/node-cli-utils/testUtils | Helper methods for use with the NodeJS test runner | 
 
 ## Reasoning
 

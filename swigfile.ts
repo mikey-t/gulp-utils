@@ -1,14 +1,13 @@
 import 'dotenv/config'
-import { emptyDirectory, ensureDockerRunning, isPlatformWindows, log, spawnAsync, spawnAsyncLongRunning, spawnDockerCompose } from './src/generalUtils.js'
+import { copyNewEnvValues, emptyDirectory, log, spawnAsync, spawnAsyncLongRunning } from './src/generalUtils.js'
 import { series, parallel } from 'swig-cli'
+import fs from 'node:fs'
 import fsp from 'node:fs/promises'
 import { config } from './src/NodeCliUtilsConfig.js'
-import { swigDockerConfig } from 'swig-cli-modules/config'
-import * as swigDocker from 'swig-cli-modules/DockerCompose'
-
+import { ensureDockerRunning, spawnDockerCompose } from './src/dockerUtils.js'
+import { red } from './src/colors.js'
 
 config.traceEnabled = false
-config.useWslPrefixForDockerCommands = isPlatformWindows()
 
 // Using direct paths to node_modules to skip the startup delay of using npm
 const tscPath = './node_modules/typescript/lib/tsc.js'
@@ -25,7 +24,7 @@ const testFiles = [
 const adminTestFiles = [
   './test/certUtils.test.ts' // Note that these tests only currently work on windows and are quite slow
 ]
-swigDockerConfig.dockerComposePath = './docker-compose.yml'
+const dockerComposePath = './docker-compose.yml'
 
 export const build = series(cleanDist, parallel(buildEsm, series(buildCjs, copyCjsPackageJson)))
 export const buildEsmOnly = series(cleanDist, buildEsm)
@@ -92,16 +91,37 @@ export async function cleanDist() {
   await emptyDirectory('./dist')
 }
 
-export const dockerUp = series(ensureDockerRunning, swigDocker.dockerUp, printSonarQubeStartupMessage)
-export const dockerUpAttached = series(ensureDockerRunning, swigDocker.dockerUpAttached, printSonarQubeStartupMessage)
-export const dockerDown = series(ensureDockerRunning, swigDocker.dockerDown, printSonarQubeStartupMessage)
+export const dockerUp = series(
+  syncEnvFile,
+  ensureDockerRunning,
+  ['dockerUp', () => spawnDockerCompose(dockerComposePath, 'up')],
+  printSonarQubeStartupMessage
+)
+
+export const dockerUpAttached = series(
+  syncEnvFile,
+  ensureDockerRunning,
+  ['dockerUpAttached', () => spawnDockerCompose(dockerComposePath, 'up', { attached: true })],
+  printSonarQubeStartupMessage
+)
+
+export const dockerDown = series(
+  syncEnvFile,
+  ensureDockerRunning,
+  ['dockerDown', () => spawnDockerCompose(dockerComposePath, 'down')],
+  printSonarQubeStartupMessage
+)
 
 // First run "swig dockerUp" and wait at least 10 seconds for the sonar web app to finish initializing
-export async function scan() {
-  await spawnDockerCompose(swigDockerConfig.dockerComposePath, 'run', { args: ['sonar-scanner'], attached: true })
-}
+export const scan = series(
+  syncEnvFile,
+  ['scan', () => spawnDockerCompose(dockerComposePath, 'run', { args: ['sonar-scanner'], attached: true })]
+)
 
-export const bashIntoSonar = () => swigDocker.bashIntoContainer('sonarqube')
+export const bashIntoSonar = series(
+  syncEnvFile,
+  ['bashIntoSonar', () => spawnDockerCompose(dockerComposePath, 'exec', { args: ['-it', 'sonarqube', 'bash'], attached: true })]
+)
 
 export async function watchEsm() {
   await spawnAsyncLongRunning('node', [tscPath, '--p', 'tsconfig.esm.json', '--watch'])
@@ -110,7 +130,7 @@ export async function watchEsm() {
 export const publish = series(
   lint,
   build,
-  ['npmPublish', () => spawnAsync('npm', ['publish'], { throwOnNonZero: true })]
+  ['npmPublish', () => spawnAsync('npm', ['publish', '--registry=https://registry.npmjs.org/'], { throwOnNonZero: true })]
 )
 
 export const publishDocs = series(
@@ -136,4 +156,8 @@ async function copyCjsPackageJson() {
 
 async function printSonarQubeStartupMessage() {
   console.log(`SonarQube url after it finishes initializing: http://localhost:${process.env.SONAR_PORT || 9000}`)
+}
+
+async function syncEnvFile() {
+  copyNewEnvValues('.env.template', '.env')
 }

@@ -1,18 +1,16 @@
-import { SpawnOptions, execSync } from 'node:child_process'
+import * as net from 'net'
+import { SpawnOptions } from 'node:child_process'
 import fs from 'node:fs'
 import fsp from 'node:fs/promises'
 import { platform } from 'node:os'
 import path, { resolve } from 'node:path'
 import * as readline from 'readline'
-import * as net from 'net'
 import { config } from './NodeCliUtilsConfig.js'
-import { SpawnOptionsInternal, copyEnv, dictionaryToEnvFileString, getEnvAsDictionary, simpleSpawnAsyncInternal, simpleSpawnSyncInternal, spawnAsyncInternal, throwIfDockerNotReady, validateFindFilesRecursivelyParams, whichInternal } from './generalUtilsInternal.js'
+import { copyEnv, dictionaryToEnvFileString, getEnvAsDictionary, simpleSpawnAsyncInternal, simpleSpawnSyncInternal, spawnAsyncInternal, validateFindFilesRecursivelyParams, whichInternal } from './generalUtilsInternal.js'
 
 // For JSDoc links
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { winInstallCert, winUninstallCert } from './certUtils.js'
-
-const dockerComposeCommandsThatSupportDetached = ['exec', 'logs', 'ps', 'restart', 'run', 'start', 'stop', 'up']
 
 /**
  * Just a wrapper for console.log() to type less.
@@ -122,11 +120,6 @@ export interface WhichResult {
   additionalLocations: string[] | undefined
   error: Error | undefined
 }
-
-/**
- * Type guard for command passed to {@link spawnDockerCompose}.
- */
-export type DockerComposeCommand = 'build' | 'config' | 'cp' | 'create' | 'down' | 'events' | 'exec' | 'images' | 'kill' | 'logs' | 'ls' | 'pause' | 'port' | 'ps' | 'pull' | 'push' | 'restart' | 'rm' | 'run' | 'start' | 'stop' | 'top' | 'unpause' | 'up' | 'version'
 
 /**
  * Sleeps for the specified number of milliseconds.
@@ -356,183 +349,6 @@ export function requireValidPath(paramName: string, paramValue: string) {
 }
 
 /**
- * Project names must contain only lowercase letters, decimal digits, dashes, and underscores, and must begin with a lowercase letter or decimal digit.
- * 
- * See https://docs.docker.com/compose/environment-variables/envvars/#compose_project_name.
- * @param projectName The string to validate
- * @returns `true` if it's a valid docker compose project name and `false` otherwise
- */
-export function isDockerComposeProjectNameValid(projectName: string): boolean {
-  requireString('projectName', projectName)
-
-  // Ensure first char is a lowercase letter or digit
-  if (!/^[a-z0-9]/.test(projectName[0])) {
-    return false
-  }
-
-  // Ensure the rest of the chars are only lowercase letters, digits, dashes and underscores
-  return /^[a-z0-9-_]+$/.test(projectName)
-}
-
-/**
- * Options for {@link spawnDockerCompose}.
- * @param projectName 
- * Note that there are other better options such as using the environment variable `COMPOSE_PROJECT_NAME`. See https://docs.docker.com/compose/environment-variables/envvars/#compose_project_name.
- * @param attached Default: false. All commands that support the detached option wil use it unless attached is specified as true (-d support: exec, logs, ps, restart, run, start, stop, up)
- * @param useDockerComposeFileDirectoryAsCwd Default: false. If true, the docker compose command will be run in the directory containing the docker compose file.
- */
-export interface DockerComposeOptions {
-  /** Additional arguments to pass to the docker-compose command. */
-  args: string[]
-
-  /**
-   * Defaults to `false`. Controls whether or not the `--detach` option is passed. Note that this only applies to
-   * some commands (exec, logs, ps, restart, run, start, stop, up).
-   */
-  attached: boolean
-
-  /**
-  * If not provided, it will default to using the directory that the docker-compose.yml is located in.
-  * Specifies what current working directory to use with the spawn command.
-  * 
-  * **Important:**: this only affects the current working directory of the spawned process itself. The docker command will still only pull in env values from a `.env`
-  * file in the same directory as the docker-compose.yml, NOT the cwd passed here. If a different `.env` file path is needed, use the {@link altEnvFilePath} option. If
-  * you use the {@link altEnvFilePath} option with a relative path, ensure that it is relative to the current working directory passed with this option.
-  */
-  cwd?: string
-
-  /**
-   * Optional. If provided, projectName will be passed as the `--project-name` param to `docker compose` so that generated containers will use it as a prefix
-   * instead of the default, which is the directory name where the docker-compose.yml is located.
-   * 
-   * Alternate approaches for setting the docker compose project name:
-   * 
-   * - Locate your docker-compose.yml file in the root of your project so that docker will use that directory name for prefixing generated containers
-   * - OR, locate your docker-compose.yml in a sub-directory named appropriately for use as a prefix for generated containers
-   * - OR, put a `.env` file in the same directory as your docker-compose.yml
-   * with the entry `COMPOSE_PROJECT_NAME=your-project-name`
-   * 
-   * Additional note on docker compose project names form the official docker compose docs: "Project names must contain only lowercase letters, decimal digits,
-   * dashes, and underscores, and must begin with a lowercase letter or decimal digit". See https://docs.docker.com/compose/environment-variables/envvars/#compose_project_name.
-   * 
-   */
-  projectName?: string
-
-  /**
-   * Optional. If provided, profile is passed to docker compose along with `--profile` param. Must match this regex: `[a-zA-Z0-9][a-zA-Z0-9_.-]+`.
-   * 
-   * See https://docs.docker.com/compose/profiles/.
-   */
-  profile?: string
-
-  /**
-   * The option `useWslPrefix` set to `true` can be used If Docker Desktop is not installed on Windows and docker commands need to execute via wsl.
-   */
-  useWslPrefix?: boolean
-
-  /**
-   * Specify an alternative env file. This is useful since docker will normally only use a `.env` file in the same directory as the docker-compose.yml file,
-   * regardless of the current working directory of the running command. This path will be passed to docker compose using the `--env-file` option.
-   * 
-   * **Important:** if using a relative path, be sure pass the appropriate value for {@link cwd} to this method so that the relative path can correctly be resolved.
-   */
-  altEnvFilePath?: string
-}
-
-/**
- * For docker compose commands, see https://docs.docker.com/compose/reference/. For available options for this wrapper function, see {@link DockerComposeOptions}.
- * 
- * The current working directory will be the directory of the {@link dockerComposePath} unless specified in the options. This ensures relative paths in the
- * docker compose file will be relative to itself by default.
- * 
- * See {@link DockerComposeOptions.projectName} for info on where to locate your docker compose file and how to specify the docker project name.
- * @param dockerComposePath Path to docker-compose.yml
- * @param dockerComposeCommand The docker-compose command to run
- * @param options {@link DockerComposeOptions} to use, including additional arguments to pass to the docker compose command and the project name
- */
-export async function spawnDockerCompose(dockerComposePath: string, dockerComposeCommand: DockerComposeCommand, options?: Partial<DockerComposeOptions>): Promise<void> {
-  requireValidPath('dockerComposePath', dockerComposePath)
-  requireString('dockerComposeCommand', dockerComposeCommand)
-  if (options?.cwd) {
-    requireValidPath('cwd', options.cwd)
-  }
-  if (options?.altEnvFilePath) {
-    requireValidPath('altEnvFilePath', options.altEnvFilePath)
-  }
-  if (options?.projectName && !isDockerComposeProjectNameValid(options.projectName)) {
-    throw new Error('Invalid docker compose project name specified for the projectName param. Project names must contain only lowercase letters, decimal digits, dashes, and underscores, and must begin with a lowercase letter or decimal digit.')
-  }
-  if (options?.profile && !/[a-zA-Z0-9][a-zA-Z0-9_.-]+/.test(options.profile)) {
-    throw new Error('Invalid profile option - must match regex: [a-zA-Z0-9][a-zA-Z0-9_.-]+')
-  }
-  if (!await isDockerRunning()) {
-    throw new Error('Docker is not running')
-  }
-
-  const defaultOptions: DockerComposeOptions = { args: [], attached: false, projectName: undefined, cwd: undefined }
-  const mergedOptions = { ...defaultOptions, ...options }
-  if (!options || options.useWslPrefix === undefined) {
-    mergedOptions.useWslPrefix = config.useWslPrefixForDockerCommands
-  }
-
-  const dockerComposeDir = path.dirname(dockerComposePath)
-  const dockerComposeFilename = path.basename(dockerComposePath)
-
-  if (!mergedOptions.cwd) {
-    mergedOptions.cwd = dockerComposeDir
-  }
-
-  let dockerComposePathResolved = mergedOptions.cwd ? path.resolve(dockerComposePath) : dockerComposeFilename
-  if (mergedOptions.useWslPrefix) {
-    dockerComposePathResolved = toWslPath(dockerComposePathResolved)
-  }
-
-  let spawnArgs = ['compose', '-f', dockerComposePathResolved]
-
-  if (mergedOptions.projectName) {
-    spawnArgs.push('--project-name', mergedOptions.projectName)
-  }
-
-  if (mergedOptions.profile) {
-    spawnArgs.push('--profile', mergedOptions.profile)
-  }
-
-  if (mergedOptions.altEnvFilePath) {
-    spawnArgs.push('--env-file', mergedOptions.useWslPrefix ? toWslPath(mergedOptions.altEnvFilePath) : mergedOptions.altEnvFilePath)
-  }
-
-  spawnArgs.push(dockerComposeCommand)
-
-  if (!mergedOptions.attached && dockerComposeCommandsThatSupportDetached.includes(dockerComposeCommand)) {
-    spawnArgs.push('--detach')
-  }
-
-  if (mergedOptions.args) {
-    spawnArgs = spawnArgs.concat(mergedOptions.args)
-  }
-
-  trace(`running command in ${mergedOptions.cwd}: docker ${spawnArgs.join(' ')}`)
-
-  const longRunning = dockerComposeCommandsThatSupportDetached.includes(dockerComposeCommand) && options?.attached === true
-
-  trace(`docker compose command will be configured to use long running option: ${longRunning}`)
-
-  const spawnOptions: Partial<SpawnOptionsInternal> = {
-    cwd: mergedOptions.cwd,
-    shell: isPlatformWindows(), // Early termination with ctrl + C on windows will not be graceful unless the shell option is set to true
-    isLongRunning: longRunning
-  }
-
-  const spawnResult = mergedOptions.useWslPrefix ?
-    await spawnAsyncInternal('wsl', ['docker', ...spawnArgs], spawnOptions) :
-    await spawnAsyncInternal('docker', spawnArgs, spawnOptions)
-
-  if (spawnResult.code !== 0) {
-    throw new Error(`docker compose command failed with code ${spawnResult.code}`)
-  }
-}
-
-/**
  * Splits a string into lines, removing `\n` and `\r` characters. Does not return empty lines. Also see {@link stringToLines}.
  * @param str String to split into lines
  * @returns An array of lines from the string, with empty lines removed
@@ -677,100 +493,6 @@ export async function which(commandName: string): Promise<WhichResult> {
  */
 export function whichSync(commandName: string): WhichResult {
   return whichInternal(commandName, simpleCmdSync, simpleSpawnSync) as WhichResult
-}
-
-/**
- * Uses {@link which} to determine if docker is installed. If the `which` call doesn't find docker and the platform
- * is Windows, then this will check the output of `wsl docker --version` to see if just the engine is installed.
- * @returns `true` if docker is installed, `false` otherwise
- */
-export async function isDockerInstalled(): Promise<boolean> {
-  if ((await which('docker')).location) {
-    return true
-  }
-  if (isPlatformWindows()) {
-    const result = await simpleSpawnAsync('wsl', ['docker', '--version'])
-    return result.code === 0
-  }
-  return false
-}
-
-/**
- * Runs the `docker info` command and looks for "error during connect" in the output to determine if docker is running. If you
- * want to check if docker is installed, use {@link isDockerInstalled}.
- * @returns `true` if docker is installed and running, `false` otherwise
- */
-export async function isDockerRunning(): Promise<boolean> {
-  try {
-    const result = isPlatformWindows() ?
-      await simpleSpawnAsync('wsl', ['docker', 'info']) :
-      await simpleSpawnAsync('docker', ['info'])
-    return result.code === 0 && !result.stdout.includes('error during connect')
-  } catch (err) {
-    return false
-  }
-}
-
-/**
- * Attempt to start the docker service if it isn't running. Whether it's running is determined by a call to {@link isDockerRunning}.
- * 
- * Notes on docker startup command:
- * - May require entering a password
- * - On Windows with Docker Desktop and from within powershell or cmd it will run in powershell: `Start-Process "C:\Program Files\Docker\Docker\Docker Desktop.exe" -NoNewWindow`
- * - On Windows without Docker Desktop from within powershell or cmd it will run: `sudo service docker start`
- * - On Linux (including WSL) it will run: `sudo systemctl start docker`
- * - Not currently supported on Mac
- * - If you're on Windows and have Docker Desktop but it is stopped and you're in a WSL shell, docker will appear as if it's not installed and this method will throw
- * 
- * @throws An {@link Error} If docker is not detected on the system.
- * @throws An {@link Error} if docker is detected as installed and not running but the OS is Mac.
- */
-export async function ensureDockerRunning(): Promise<void> {
-  if (!await isDockerInstalled()) {
-    throw new Error('Docker does not appear to be installed')
-  }
-
-  if (await isDockerRunning()) {
-    return
-  }
-
-  let command: string
-  let args: string[] = []
-  const isWindows = isPlatformWindows()
-  const isLinux = isPlatformLinux()
-  const dockerDesktopPath = 'C:\\Program Files\\Docker\\Docker\\Docker Desktop.exe'
-  let useExec = false
-
-  if (isWindows) {
-    if (fs.existsSync(dockerDesktopPath)) {
-      command = 'powershell'
-      args = getPowershellHackArgs(`Start-Process 'C:\\Program Files\\Docker\\Docker\\Docker Desktop.exe' -NoNewWindow`)
-    } else {
-      command = 'C:\\windows\\system32\\wsl.exe -u root -e sh -c "service docker start"'
-      useExec = true
-    }
-  } else if (isLinux) {
-    command = 'sudo'
-    args = ['service', 'docker', 'start']
-  } else {
-    throw new Error('Starting docker within ensureDockerRunning is only supported on Windows and Linux - you will have to start docker manually')
-  }
-
-  if (useExec) {
-    try {
-      execSync(command, { stdio: 'inherit' })
-    } catch (err) {
-      throw new ExtendedError('Unable to start docker', getNormalizedError(err))
-    }
-  } else {
-    const result = await spawnAsync(command, args, { shell: isWindows })
-    if (result.code !== 0) {
-      throw new Error('Unable to start docker - see error above')
-    }
-  }
-
-  // Wait for docker to be up and ready before continuing
-  await withRetryAsync(throwIfDockerNotReady, 6, 3000, { initialDelayMilliseconds: 3000 })
 }
 
 /**
@@ -1336,6 +1058,7 @@ export enum Emoji {
   Stop = '🛑',
   Certificate = '📜',
   Key = '🔑',
+  Scull = '☠️',
 }
 
 /**
@@ -1373,17 +1096,30 @@ export function toWslPath(winPath: string, wrapInQuotesIfSpaces: boolean = true)
   return wslPath
 }
 
+/**
+ * Serialize a class instance. Ignore properties with underscore prefix and include getters. Useful for overriding the `toJSON` function of
+ * a class so that calls to `JSON.stringify()` will generate more appropriate JSON.
+ * 
+ * @example
+ * ```
+ * class MyClass {
+ *   //...
+ *   toJSON = () => classToJson(this)
+ *   //...
+ * }
+ * ```
+ * @param instance A class instance, usually `this` if `classToJson` is being used as a class method.
+ * @returns Json serialization of the class instance.
+ */
 export function classToJson(instance: object) {
   const jsonObj: { [key: string]: unknown } = {}
 
-  // Include public fields
   for (const [key, value] of Object.entries(instance)) {
     if (!key.startsWith('_')) {
       jsonObj[key] = value
     }
   }
 
-  // Include fields with getters
   const proto = Object.getPrototypeOf(instance)
   for (const key of Object.getOwnPropertyNames(proto)) {
     if (key.startsWith('_')) continue
@@ -1394,4 +1130,75 @@ export function classToJson(instance: object) {
     }
   }
   return jsonObj
+}
+
+/**
+ * Get's the value for the CLI param at process.argv[`argvIndex`] and throws the specified optional `errorMessage`
+ * or a default error message if the CLI arg is missing.
+ * 
+ * Notes on common index position values:
+ * 
+ * - `0`: NodeJS path
+ * - `1`: Script path
+ * - `2`: First script param - for `swig` this will be the task name
+ * @param errorMessage 
+ * @returns 
+ */
+export function getRequiredCliParam(argvIndex: number, errorMessage?: string) {
+  if (argvIndex < 0) {
+    throw new Error('The argvIndex must be greater than or equal to 0')
+  }
+  const defaultErrorMessage = `Missing required CLI param at argv index ${argvIndex}`
+  const paramValue = process.argv[argvIndex]
+  // Allow falsy values like "0" - it can be anything except undefined
+  if (paramValue === undefined) {
+    throw new Error(errorMessage ?? defaultErrorMessage)
+  }
+  return paramValue
+}
+
+type AsyncBooleanFunc = () => Promise<boolean>
+type AsyncFunc<T> = () => Promise<T>
+
+
+/**
+ * Executes an asynchronous function conditionally.
+ *
+ * @overload
+ * @template T The type of value that the `asyncFunc` returns.
+ * @param condition A boolean that determines if the `asyncFunc` should be executed.
+ * @param asyncFunc The async function to execute if the condition is true.
+ * @param logEnabled Optional. Determines whether to enable logging. Defaults to `false`.
+ * @returns Returns a Promise resolving to the value returned by `asyncFunc` if the condition is true, otherwise returns `undefined`.
+ */
+export async function conditionallyAsync<T>(condition: boolean, asyncFunc: AsyncFunc<T>, logEnabled?: boolean): Promise<T | undefined>
+
+/**
+ * Executes an asynchronous function conditionally.
+ *
+ * @overload
+ * @template T The type of value that the `asyncFunc` returns.
+ * @param conditionAsyncFunc An async function that returns a boolean that determines whether `asyncFunc` should be executed.
+ * @param asyncFunc The async function to execute if the condition is true.
+ * @param logEnabled Optional. Determines whether to enable logging. Defaults to `false`.
+ * @returns Returns a Promise resolving to the value returned by `asyncFunc` if the condition is true, otherwise returns `undefined`.
+ */
+export async function conditionallyAsync<T>(conditionAsyncFunc: AsyncBooleanFunc, asyncFunc: AsyncFunc<T>, logEnabled?: boolean): Promise<T | undefined>
+
+// JSDoc is covered by function overloads above
+export async function conditionallyAsync<T>(conditionOrConditionAsyncFunc: boolean | AsyncBooleanFunc, asyncFunc: () => Promise<T>, logEnabled: boolean = false): Promise<T | undefined> {
+  let resolvedCondition: boolean
+
+  if (typeof conditionOrConditionAsyncFunc === 'function') {
+    resolvedCondition = await conditionOrConditionAsyncFunc()
+  } else {
+    resolvedCondition = conditionOrConditionAsyncFunc
+  }
+
+  if (resolvedCondition) {
+    logIf(logEnabled, 'conditional check is true - running')
+    return await asyncFunc()
+  } else {
+    logIf(logEnabled, 'conditional check is false - skipping')
+  }
 }

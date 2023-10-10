@@ -112,11 +112,20 @@ set trace enabled with:
 config.traceEnabled = true
 ```
 
+## Docker Desktop vs Daemon Only on Windows
+
+Due to Docker's change in license policy, more people are installing Docker on Windows without the full "Docker Desktop" functionality. Because of this it's important to be able to spawn docker commands with either `docker` OR `wsl docker`. I added functionality to all the docker utility functions to use `wsl docker` if the platform is detected as Windows. If you want the docker utility functions to use just `docker` instead of `wsl docker`, you can change a config value like this:
+
+```javascript
+import { config, isPlatformWindows } from '@mikeyt23/node-cli-utils'
+config.useWslPrefixForDockerCommandsOnWindows = false
+```
+
 ## SonarQube Quality/Security Scanning
 
 Initial setup:
 
-- If on windows 10 and WSL 2
+- We need to setup a kernel config value for elasticsearch to work. If on windows 10 and WSL 2:
     - Ensure `%USERPROFILE%/.wslconfig` has these lines:
     ```
     [wsl2]

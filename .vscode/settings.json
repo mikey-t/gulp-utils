@@ -15,7 +15,12 @@
   "cSpell.words": [
     "BAAA",
     "certpbe",
-    "keyout"
+    "Dsonar",
+    "keyout",
+    "Qube",
+    "sonarqube",
+    "USERPROFILE",
+    "wslconfig"
   ],
   "typescript.preferences.importModuleSpecifier": "relative",
   "javascript.preferences.importModuleSpecifier": "relative"

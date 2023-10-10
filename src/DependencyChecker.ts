@@ -2,7 +2,8 @@ import { spawnSync } from 'node:child_process'
 import chalk from 'chalk'
 import { platform as rawPlatformString } from 'node:process'
 import * as net from 'net'
-import { isDockerRunning, isPlatformLinux, isPlatformMac, isPlatformWindows, spawnAsync, whichSync } from './generalUtils.js'
+import { isPlatformLinux, isPlatformMac, isPlatformWindows, spawnAsync, whichSync } from './generalUtils.js'
+import { isDockerRunning } from './dockerUtils.js'
 
 export type PlatformCode = 'win' | 'linux' | 'mac'
 export type StringBoolEntry = { key: string, value: boolean }

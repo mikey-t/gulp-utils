@@ -1,5 +1,5 @@
 import { describe, it } from 'node:test'
-import { humanizeTime, requireString, toWslPath, which, whichSync } from '../src/generalUtils.js'
+import { conditionallyAsync, humanizeTime, requireString, toWslPath, which, whichSync } from '../src/generalUtils.js'
 import assert from 'node:assert'
 import { assertErrorMessageEquals, assertErrorMessageStartsWith } from '../src/testUtils.js'
 
@@ -139,5 +139,38 @@ describe('toWslPath', () => {
     const expected = `/mnt/c/a/path with/spaces/and'single'quotes`
     const wslPath = toWslPath(winPath, false)
     assert.strictEqual(wslPath, expected)
+  })
+})
+
+interface Fruit {
+  name: string
+  color: string
+}
+
+async function getFruits(): Promise<Fruit[]> {
+  return [
+    { name: 'orange', color: 'orange' },
+    { name: 'strawberry', color: 'red' }
+  ]
+}
+
+describe('conditionallyAsync', () => {
+  it('returns result if condition is true', async () => {
+    const expected = await getFruits()
+    const result = await conditionallyAsync<Fruit[]>(true, getFruits)
+    assert.deepStrictEqual(result, expected)
+  })
+  it('returns undefined if condition is false', async () => {
+    const result = await conditionallyAsync<Fruit[]>(false, getFruits)
+    assert.strictEqual(result, undefined)
+  })
+  it('returns result if condition is function that returns true', async () => {
+    const expected = await getFruits()
+    const result = await conditionallyAsync<Fruit[]>(async () => true, getFruits)
+    assert.deepStrictEqual(result, expected)
+  })
+  it('returns undefined if condition is function that returns false', async () => {
+    const result = await conditionallyAsync<Fruit[]>(async () => false, getFruits)
+    assert.strictEqual(result, undefined)
   })
 })

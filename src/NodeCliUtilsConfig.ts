@@ -1,3 +1,5 @@
+import { isPlatformWindows } from './generalUtils.js'
+
 /**
  * Config to control a few misc settings in the node-cli-utils package. This module exports a singleton instance.
  */
@@ -6,7 +8,7 @@ export class NodeCliUtilsConfig {
   private _orphanProtectionPollingIntervalMillis = 15000
   private _orphanProtectionLoggingEnabled = false
   private _orphanProtectionLoggingPath = './orphanProtection.log'
-  private _useWslPrefixForDockerCommands: boolean = false
+  private _useWslPrefixForDockerCommandsOnWindows: boolean = true
 
   get traceEnabled(): boolean {
     return this._traceEnabled
@@ -36,16 +38,12 @@ export class NodeCliUtilsConfig {
     return this._orphanProtectionLoggingPath
   }
 
-  get useWslPrefixForDockerCommands(): boolean {
-    return this._useWslPrefixForDockerCommands
+  get useWslPrefixForDockerCommandsOnWindows(): boolean {
+    return isPlatformWindows() && this._useWslPrefixForDockerCommandsOnWindows
   }
-
-  /**
-   * If `true`, docker commands that normally just run `docker` will use `wsl docker` instead. This requires any paths
-   * passed to be wsl paths, but these should be handled internally with no additional action required by the caller.
-   */
-  set useWslPrefixForDockerCommands(value: boolean) {
-    this._useWslPrefixForDockerCommands = value
+  
+  set useWslPrefixForDockerCommandsOnWindows(value: boolean) {
+    this._useWslPrefixForDockerCommandsOnWindows = value
   }
 }
 

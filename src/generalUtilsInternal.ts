@@ -263,7 +263,7 @@ export function simpleSpawnSyncInternal(command: string, args?: string[], throwO
   const spawnResult: SimpleSpawnResult = {
     code: result.status ?? 1,
     stdout: result.stdout.toString(),
-    stderr: result.stdout.toString(),
+    stderr: result.stderr.toString(),
     stdoutLines: stringToNonEmptyLines(result.stdout.toString()),
     error: result.error,
     cwd: process.cwd()
@@ -284,7 +284,7 @@ export async function simpleSpawnAsyncInternal(command: string, args?: string[],
   const spawnResult: SimpleSpawnResult = {
     code: result.code,
     stdout: result.stdout,
-    stderr: result.stdout,
+    stderr: result.stderr,
     stdoutLines: stringToNonEmptyLines(result.stdout),
     error: result.error,
     cwd: process.cwd()
