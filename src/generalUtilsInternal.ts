@@ -3,7 +3,7 @@ import fs from 'node:fs'
 import fsp from 'node:fs/promises'
 import path from 'node:path'
 import { config } from './NodeCliUtilsConfig.js'
-import { SimpleSpawnError, SimpleSpawnResult, SpawnError, SpawnOptionsWithThrow, SpawnResult, StringKeyedDictionary, WhichResult, isPlatformWindows, log, requireString, requireValidPath, simpleSpawnAsync, sortDictionaryByKeyAsc, spawnAsync, stringToNonEmptyLines, stripShellMetaCharacters, trace } from './generalUtils.js'
+import { ExtendedError, SimpleSpawnError, SimpleSpawnResult, SpawnError, SpawnOptionsWithThrow, SpawnResult, StringKeyedDictionary, WhichResult, isErrorEnoent, isPlatformWindows, log, requireString, requireValidPath, simpleSpawnAsync, sortDictionaryByKeyAsc, spawnAsync, stringToNonEmptyLines, stripShellMetaCharacters, trace } from './generalUtils.js'
 
 const isCommonJS = typeof require === "function" && typeof module === "object" && module.exports
 const isEsm = !isCommonJS
@@ -89,7 +89,7 @@ export async function spawnAsyncInternal(command: string, args: string[], option
       const child = spawn(command, args, mergedOptions)
       const childId: number | undefined = child.pid
       if (childId === undefined) {
-        throw new Error(`${logPrefix}ChildProcess pid is undefined - spawn failed`)
+        trace(`${logPrefix}ChildProcess pid is undefined - spawn failed - an error event should be emitted shortly`)
       }
 
       // This event will only be emitted when stdio is NOT set to 'inherit'
@@ -118,7 +118,10 @@ export async function spawnAsyncInternal(command: string, args: string[], option
       })
 
       child.on('error', (error) => {
-        trace(`${logPrefix}ChildProcess emitted an error event: `, error)
+        if (isErrorEnoent(error)) {
+          throw new ExtendedError(`Command not found: ${command}`, error)
+        }
+        throw new ExtendedError('ChildProcess emitted an error event - see innerError', error)
       })
     } catch (err) {
       reject(err)

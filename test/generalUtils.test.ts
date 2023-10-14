@@ -1,7 +1,11 @@
-import { describe, it } from 'node:test'
-import { conditionallyAsync, humanizeTime, requireString, toWslPath, which, whichSync } from '../src/generalUtils.js'
 import assert from 'node:assert'
-import { assertErrorMessageEquals, assertErrorMessageStartsWith } from '../src/testUtils.js'
+import path from 'node:path'
+import { describe, it } from 'node:test'
+import { config } from '../src/NodeCliUtilsConfig.js'
+import { conditionallyAsync, humanizeTime, requireString, spawnAsync, toWslPath, which, whichSync } from '../src/generalUtils.js'
+import { assertErrorMessageEquals, assertErrorMessageStartsWith, fixturesDir } from '../src/testUtils.js'
+
+config.traceEnabled = false
 
 const testParamName = 'test'
 const expectedRequireStringError = `Required param '${testParamName}' is missing`
@@ -172,5 +176,16 @@ describe('conditionallyAsync', () => {
   it('returns undefined if condition is function that returns false', async () => {
     const result = await conditionallyAsync<Fruit[]>(async () => false, getFruits)
     assert.strictEqual(result, undefined)
+  })
+})
+
+describe('spawnAsync', () => {
+  it('can spawn a simple node script', async () => {
+    const result = await spawnAsync('node', [path.join(fixturesDir, 'nodeScript.js')])
+    assert.strictEqual(result.code, 0)
+  })
+  it('result has non-zero code attempting to spawn node against nonexistent script', async () => {
+    const result = await spawnAsync('node', [path.join(fixturesDir, 'thisScriptDoesNotExist.js')])
+    assert.strictEqual(result.code, 1)
   })
 })

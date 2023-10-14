@@ -1202,3 +1202,23 @@ export async function conditionallyAsync<T>(conditionOrConditionAsyncFunc: boole
     logIf(logEnabled, 'conditional check is false - skipping')
   }
 }
+
+/**
+ * Type guard function to check if an Error is a `NodeJS.ErrnoException`.
+ * @param err The Error object to check.
+ * @returns `true` if it's a NodeJS.ErrnoException and `false` otherwise.
+ */
+export function isErrnoException(err: unknown): err is NodeJS.ErrnoException {
+  return err instanceof Error
+    && 'code' in err
+    && 'errno' in err
+    && 'path' in err
+    && 'syscall' in err
+}
+
+/**
+ * Return `true` if `err` is a `NodeJS.ErrnoException` and has a `code` property equal to `ENOENT`.
+ */
+export function isErrorEnoent(err: unknown): boolean {
+  return isErrnoException(err) && err.code === 'ENOENT'
+}
