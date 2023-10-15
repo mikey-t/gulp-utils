@@ -1,6 +1,6 @@
 {
   "name": "@mikeyt23/node-cli-utils",
-  "version": "2.0.8",
+  "version": "2.0.9",
   "description": "Some node cli utility functions",
   "author": "Mike Thompson",
   "license": "MIT",
@@ -121,19 +121,17 @@
     "node": "18.17.1"
   },
   "devDependencies": {
-    "@types/node": "^18.17.15",
-    "@typescript-eslint/eslint-plugin": "^6.6.0",
-    "@typescript-eslint/parser": "^6.6.0",
+    "@types/node": "^18.18.5",
+    "@typescript-eslint/eslint-plugin": "^6.7.5",
+    "@typescript-eslint/parser": "^6.7.5",
     "c8": "^8.0.1",
     "dotenv": "^16.3.1",
-    "eslint": "^8.49.0",
+    "eslint": "^8.51.0",
+    "swig-cli": "^0.0.15",
     "ts-node": "^10.9.1",
-    "tsx": "^3.12.10",
-    "typedoc": "^0.25.1",
+    "tsx": "^3.13.0",
+    "typedoc": "^0.25.2",
     "typedoc-plugin-missing-exports": "^2.1.0",
     "typescript": "^5.2.2"
-  },
-  "dependencies": {
-    "swig-cli": "^0.0.14"
   }
 }
