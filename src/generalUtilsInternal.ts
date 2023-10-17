@@ -84,7 +84,7 @@ export async function spawnAsyncInternal(command: string, args: string[], option
 
   return new Promise((resolve, reject) => {
     try {
-      const result: SpawnResult = getInitialSpawnResult()
+      const result: SpawnResult = getInitialSpawnResult(mergedOptions)
 
       const child = spawn(command, args, mergedOptions)
       const childId: number | undefined = child.pid
