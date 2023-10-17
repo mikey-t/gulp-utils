@@ -119,7 +119,7 @@ export async function spawnAsyncInternal(command: string, args: string[], option
 
       child.on('error', (error) => {
         if (isErrorEnoent(error)) {
-          throw new ExtendedError(`Command not found: ${command}`, error)
+          throw new ExtendedError(`Command or path not found: ${command}`, error)
         }
         throw new ExtendedError('ChildProcess emitted an error event - see innerError', error)
       })
@@ -135,6 +135,10 @@ function getResultCode(code: number | null, isLongRunning: boolean) {
 }
 
 const setDefaultsAndMergeOptions = (options?: Partial<SpawnOptionsInternal>): SpawnOptionsInternal => {
+  if (options?.cwd && !fs.existsSync(options.cwd)) {
+    throw new Error(`The cwd path provided does not exist: ${options.cwd}`)
+  }
+  
   const defaultSpawnOptions: SpawnOptionsInternal = { stdio: 'inherit', isLongRunning: false, throwOnNonZero: false }
   return { ...defaultSpawnOptions, ...options }
 }
