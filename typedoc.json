@@ -8,6 +8,7 @@
     "src/NodeCliUtilsConfig.ts",
     "src/DependencyChecker.ts",
     "src/hostFileUtils.ts",
+    "src/parallel.ts",
     "src/testUtils.ts"
   ],
   "out": "../node-cli-utils-docs/docs",

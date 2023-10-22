@@ -2,7 +2,7 @@ import assert from 'node:assert'
 import path from 'node:path'
 import { describe, it } from 'node:test'
 import { config } from '../src/NodeCliUtilsConfig.js'
-import { conditionallyAsync, humanizeTime, requireString, spawnAsync, toWslPath, which, whichSync } from '../src/generalUtils.js'
+import { conditionallyAsync, getRandomIntInclusive, humanizeTime, requireString, spawnAsync, toWslPath, which, whichSync } from '../src/generalUtils.js'
 import { assertErrorMessageEquals, assertErrorMessageStartsWith, fixturesDir } from '../src/testUtils.js'
 
 config.traceEnabled = false
@@ -185,7 +185,25 @@ describe('spawnAsync', () => {
     assert.strictEqual(result.code, 0)
   })
   it('result has non-zero code attempting to spawn node against nonexistent script', async () => {
-    const result = await spawnAsync('node', [path.join(fixturesDir, 'thisScriptDoesNotExist.js')])
+    const result = await spawnAsync('node', [path.join(fixturesDir, 'thisScriptDoesNotExist.js')], { stdio: 'pipe' })
     assert.strictEqual(result.code, 1)
+  })
+})
+
+describe('getRandomIntInclusive', () => {
+  it('returns all the same number of min and max are the same', () => {
+    const results: number[] = []
+    for (let i = 0; i < 50; i++) {
+      results.push(getRandomIntInclusive(42, 42))
+    }
+    const expected = Array(50).fill(42)
+    assert.deepStrictEqual(results, expected)
+  })
+  it('throws if max is less than min', () => {
+    assert.throws(() => getRandomIntInclusive(42, 41), err => assertErrorMessageStartsWith(err, 'The value of "max" is out of range.'))
+  })
+  it('works for negative numbers', () => {
+    const result = getRandomIntInclusive(-5, -1)
+    assert.strictEqual(result <= -1 && result >= -5, true, 'The random number generated was not in the negative range specified by the params -5 and -1')
   })
 })

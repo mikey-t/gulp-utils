@@ -95,6 +95,16 @@
         "default": "./dist/cjs/hostFileUtils.js"
       }
     },
+    "./parallel": {
+      "import": {
+        "types": "./dist/esm/parallel.d.ts",
+        "default": "./dist/esm/parallel.js"
+      },
+      "require": {
+        "types": "./dist/cjs/parallel.d.ts",
+        "default": "./dist/cjs/parallel.js"
+      }
+    },
     "./testUtils": {
       "import": {
         "types": "./dist/esm/testUtils.d.ts",
