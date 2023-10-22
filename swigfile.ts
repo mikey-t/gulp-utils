@@ -18,6 +18,7 @@ const testFiles = [
   './test/generalUtils.test.ts',
   './test/findFilesRecursively.test.ts',
   './test/TarballUtility.test.ts',
+  './test/parallel.test.ts'
 ]
 const adminTestFiles = [
   './test/certUtils.test.ts' // Note that these tests only currently work on windows and are quite slow

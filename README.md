@@ -30,6 +30,7 @@ Utility functions are grouped into the following sub-modules:
 | @mikeyt23/node-cli-utils/colors | Utils methods to add color to CLI output |
 | @mikeyt23/node-cli-utils/DependencyChecker | Util class for checking system dependencies |
 | @mikeyt23/node-cli-utils/hostFileUtils | Host file utils |
+| @mikeyt23/node-cli-utils/parallel | A runParallel method and a ParallelExecutor class |
 | @mikeyt23/node-cli-utils/testUtils | Helper methods for use with the NodeJS test runner | 
 
 ## Reasoning

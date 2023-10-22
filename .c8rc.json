@@ -11,6 +11,7 @@
         "src/generalUtils.ts",
         "src/generalUtilsInternal.ts",
         "src/NodeCliUtilsConfig.ts",
-        "src/TarballUtility.ts"
+        "src/TarballUtility.ts",
+        "src/parallel.ts"
     ]
 }

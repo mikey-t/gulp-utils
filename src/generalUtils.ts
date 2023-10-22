@@ -1,3 +1,4 @@
+import { randomInt } from 'crypto'
 import * as net from 'net'
 import { SpawnOptions } from 'node:child_process'
 import fs from 'node:fs'
@@ -1221,4 +1222,24 @@ export function isErrnoException(err: unknown): err is NodeJS.ErrnoException {
  */
 export function isErrorEnoent(err: unknown): boolean {
   return isErrnoException(err) && err.code === 'ENOENT'
+}
+
+/**
+ * Get a timestamp string with no punctuation in the format `YYYYMMDDHHmmss`.
+ * @param date An optional Date object to generate the timestamp string from, instead of using "now".
+ * @returns String in the format `YYYYMMDDHHmmss`.
+ */
+export function getTimestampUnformatted(date?: Date): string {
+  const d = date ?? new Date()
+  const year = d.getFullYear()
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  const hours = String(d.getHours()).padStart(2, '0')
+  const minutes = String(d.getMinutes()).padStart(2, '0')
+  const seconds = String(d.getSeconds()).padStart(2, '0')
+  return `${year}${month}${day}${hours}${minutes}${seconds}`
+}
+
+export function getRandomIntInclusive(min: number, max: number): number {
+  return randomInt(min, max + 1)
 }
