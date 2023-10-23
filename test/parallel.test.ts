@@ -58,6 +58,7 @@ describe('runParallel', () => {
     assert.strictEqual(result.numSuccessful, 5)
     assert.strictEqual(result.numFailed, 0)
     assert.strictEqual(result.noFailures, true)
+    assert.strictEqual(result.onlyFirstN, 5)
   })
   it('handles failures from evaluations using isResultSuccessFunc param', async () => {
     const [strings,] = getItems()

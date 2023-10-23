@@ -205,7 +205,7 @@ export async function runParallel<InputType, OutputType>(itemsToOperateOn: Itera
       && isResultSuccessFunc(itemResult.outputResult)
   }
 
-  const parallelResult = new ParallelResult([...itemResults, ...skippedItemResults])
+  const parallelResult = new ParallelResult([...itemResults, ...skippedItemResults], mergedOptions.onlyFirstN)
 
   return parallelResult
 }
