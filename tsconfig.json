@@ -24,11 +24,10 @@
     "test/**/*.ts"
   ],
   "exclude": [
+    ".vscode",
+    "coverage",
     "dist",
-    "docs",
-    "playground",
     "node_modules",
-    "docker",
     "test/fixtures",
     "test/temp"
   ],

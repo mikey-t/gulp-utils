@@ -2,13 +2,15 @@ import assert from 'node:assert'
 import path from 'node:path'
 import { describe, it } from 'node:test'
 import { config } from '../src/NodeCliUtilsConfig.js'
-import { conditionallyAsync, getRandomIntInclusive, humanizeTime, requireString, spawnAsync, toWslPath, which, whichSync } from '../src/generalUtils.js'
-import { assertErrorMessageEquals, assertErrorMessageStartsWith, fixturesDir } from '../src/testUtils.js'
+import { conditionallyAsync, getRandomIntInclusive, humanizeTime, isChildPath, requireString, spawnAsync, toWslPath, which, whichSync } from '../src/generalUtils.js'
+import { assertErrorMessageEquals, assertErrorMessageStartsWith, fixturesDir, only } from '../src/testUtils.js'
 
 config.traceEnabled = false
 
 const testParamName = 'test'
 const expectedRequireStringError = `Required param '${testParamName}' is missing`
+const childPathCheckParentDirRelative = './test/fixtures/isChildPathTest/parent'
+const childPathCheckParentDir = path.resolve(childPathCheckParentDirRelative)
 
 describe('humanizeTime', () => {
   it('should return 0 ms for 0', () => {
@@ -205,5 +207,104 @@ describe('getRandomIntInclusive', () => {
   it('works for negative numbers', () => {
     const result = getRandomIntInclusive(-5, -1)
     assert.strictEqual(result <= -1 && result >= -5, true, 'The random number generated was not in the negative range specified by the params -5 and -1')
+  })
+})
+
+describe('isChildPath', only, () => {
+  it('should return true for relative paths and child is subdirectory of parentDir', () => {
+    const parentDir = childPathCheckParentDirRelative
+    const child = `${childPathCheckParentDirRelative}/child`
+    const actual = isChildPath(parentDir, child)
+    assert.strictEqual(actual, true)
+  })
+  it('should return true when child is a relative file that exists', () => {
+    const parentDir = childPathCheckParentDirRelative
+    const child = `${childPathCheckParentDirRelative}/child/placeholder.txt`
+    const actual = isChildPath(parentDir, child)
+    assert.strictEqual(actual, true)
+  })
+  it('should return true when child is a relative file that does not exist', () => {
+    const parentDir = childPathCheckParentDirRelative
+    const child = `${childPathCheckParentDirRelative}/child/does-not-exist.txt`
+    const actual = isChildPath(parentDir, child)
+    assert.strictEqual(actual, true)
+  })
+  it('should return false for relative paths when child is not a subdirectory of parentDir', () => {
+    const parentDir = './test/fixtures/isChildPathTest/parent'
+    const child = './test/fixtures/isChildPathTest'
+    const actual = isChildPath(parentDir, child)
+    assert.strictEqual(actual, false)
+  })
+  it('should return true for absolute paths when child is subdirectory of parentDir', () => {
+    const parentDir = path.resolve(childPathCheckParentDir)
+    const child = path.resolve(path.join(childPathCheckParentDir, 'some-directory'))
+    const actual = isChildPath(parentDir, child)
+    assert.strictEqual(actual, true)
+  })
+  it('should return false for absolute paths when child is not a subdirectory of parentDir', () => {
+    const parentDir = path.resolve(childPathCheckParentDir)
+    const child = path.resolve(path.join(childPathCheckParentDir, '../../some-directory'))
+    const actual = isChildPath(parentDir, child)
+    assert.strictEqual(actual, false)
+  })
+  it('should return true for paths with ".."', () => {
+    const parentDir = `${childPathCheckParentDirRelative}/../`
+    const child = `${childPathCheckParentDirRelative}/child`
+    const actual = isChildPath(parentDir, child)
+    assert.strictEqual(actual, true)
+  })
+  it('should return false for paths with ".." that reach parent directory', () => {
+    const parent = childPathCheckParentDirRelative
+    const child = `${childPathCheckParentDirRelative}/..`
+    const actual = isChildPath(parent, child)
+    assert.strictEqual(actual, false)
+  })
+  it('should return false for paths with ".." that reach above the parent directory', () => {
+    const parent = childPathCheckParentDirRelative
+    const child = `${childPathCheckParentDirRelative}/../../`
+    const actual = isChildPath(parent, child)
+    assert.strictEqual(actual, false)
+  })
+  it('should return false if directory is checked against itself', () => {
+    const actual = isChildPath(childPathCheckParentDir, childPathCheckParentDir)
+    assert.strictEqual(actual, false)
+  })
+  it('should return true when parent is relative and child is absolute', () => {
+    const parent = childPathCheckParentDirRelative
+    const child = path.resolve(path.join(childPathCheckParentDir, 'child'))
+    const actual = isChildPath(parent, child)
+    assert.strictEqual(actual, true)
+  })
+  it('should return true when parent is absolute and child is relative', () => {
+    const parent = childPathCheckParentDirRelative
+    const child = path.resolve(path.join(childPathCheckParentDir, 'child'))
+    const actual = isChildPath(parent, child)
+    assert.strictEqual(actual, true)
+  })
+  it('should return false when child is relative and outside the parentDir', () => {
+    const parent = childPathCheckParentDirRelative
+    const child = './someFile.txt'
+    const actual = isChildPath(parent, child)
+    assert.strictEqual(actual, false)
+  })
+  it('throws if child path does not exist and requireChildExists is set to true', () => {
+    const parent = childPathCheckParentDirRelative
+    const child = './someFile.txt'
+    assert.throws(
+      () => isChildPath(parent, child, true),
+      err => assertErrorMessageEquals(err, 'The child path passed does not exist and requireChildExists was set to true')
+    )
+  })
+  it('throws if parentDir does not exist', only, () => {
+    assert.throws(
+      () => isChildPath('./test/fixtures/does-not-exist', './test/fixtures/isChildPathTest/child'),
+      err => assertErrorMessageStartsWith(err, 'Invalid or nonexistent path provided')
+    )
+  })
+  it('throws if parentDir is not a directory', only, () => {
+    assert.throws(
+      () => isChildPath('./test/fixtures/isChildPathTest/parent/placeholder.txt', './test/fixtures/isChildPathTest/parent/placeholder.txt/child'),
+      err => assertErrorMessageEquals(err, 'The parentDir param must be an existing directory')
+    )
   })
 })

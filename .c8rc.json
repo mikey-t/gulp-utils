@@ -7,11 +7,15 @@
     "include": [
         "src/certUtils.ts",
         "src/dbMigrationUtils.ts",
+        "src/DependencyChecker.ts",
+        "src/dockerUtils.ts",
         "src/dotnetUtils.ts",
         "src/generalUtils.ts",
         "src/generalUtilsInternal.ts",
+        "src/GitUtility.ts",
+        "src/hostFileUtils.ts",
         "src/NodeCliUtilsConfig.ts",
-        "src/TarballUtility.ts",
-        "src/parallel.ts"
+        "src/parallel.ts",
+        "src/TarballUtility.ts"
     ]
 }

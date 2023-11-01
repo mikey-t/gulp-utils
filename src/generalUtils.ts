@@ -834,6 +834,10 @@ export function getHostname(url: string): string {
 }
 
 export async function isDirectory(path: string): Promise<boolean> {
+  if (!fs.existsSync(path)) {
+    trace(`isDirectory returning false because path does not exist`)
+    return false
+  }
   try {
     const stats = await fsp.stat(path)
     return stats.isDirectory()
@@ -1269,6 +1273,40 @@ export function getTimestampUnformatted(date?: Date): string {
   return `${year}${month}${day}${hours}${minutes}${seconds}`
 }
 
+/**
+ * Wrapper function for built-in crypto lib `randomInt`, but `min` and `max` are both inclusive.
+ */
 export function getRandomIntInclusive(min: number, max: number): number {
   return randomInt(min, max + 1)
+}
+
+/**
+ * Check if `child` path is a file or subdirectory underneath the `parentDir` directory. The `parentDir` param must be
+ * a valid path and a directory. The `child` path does not need to exist, but note that if the child path is relative,
+ * it will be resolved using the current working directory. Transform or resolve the child path before passing into this
+ * method to avoid using current working directory.
+ * @param parentDir An existing directory to check the `child` path against.
+ * @param child An existing or non-existent path to check against the `parentDir` path.
+ * @param requireChildExists Pass `true` if you want an exception to be thrown in the `child` path does not exist. Defaults to `false`.
+ * @returns `true` if the `child` path is a descendant of `parentDir`
+ */
+export function isChildPath(parentDir: string, child: string, requireChildExists = false): boolean {
+  requireValidPath('parentDir', parentDir)
+  if (!fs.statSync(parentDir).isDirectory()) {
+    throw new Error('The parentDir param must be an existing directory')
+  }
+  if (requireChildExists && !fs.existsSync(child)) {
+    throw new Error('The child path passed does not exist and requireChildExists was set to true')
+  }
+
+  const parentPath = path.normalize(path.resolve(parentDir))
+  const childPath = path.normalize(path.resolve(child))
+
+  log(`parentPath: ${parentPath}`)
+  log(`childPath: ${childPath}`)
+
+  return (
+    childPath !== parentPath &&
+    childPath.startsWith(parentPath + path.sep)
+  )
 }

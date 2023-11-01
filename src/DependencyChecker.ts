@@ -1,15 +1,15 @@
-import { spawnSync } from 'node:child_process'
 import chalk from 'chalk'
-import { platform as rawPlatformString } from 'node:process'
 import * as net from 'net'
-import { isPlatformLinux, isPlatformMac, isPlatformWindows, spawnAsync, whichSync } from './generalUtils.js'
+import { spawnSync } from 'node:child_process'
+import { platform as rawPlatformString } from 'node:process'
 import { isDockerRunning } from './dockerUtils.js'
+import { isPlatformLinux, isPlatformMac, isPlatformWindows, simpleSpawnAsync, spawnAsync, trace, which, whichSync } from './generalUtils.js'
 
 export type PlatformCode = 'win' | 'linux' | 'mac'
 export type StringBoolEntry = { key: string, value: boolean }
 export type StringBoolArray = StringBoolEntry[]
 
-export default abstract class DependencyChecker {
+export abstract class DependencyChecker {
   protected platformCode: PlatformCode
 
   constructor() {
@@ -85,25 +85,7 @@ export default abstract class DependencyChecker {
   }
 
   protected async hasDotnetSdkGreaterThanOrEqualTo(minimumMajorVersion: number): Promise<boolean> {
-    if (!whichSync('dotnet').location) {
-      return false
-    }
-
-    const childProc = spawnSync('dotnet', ['--list-sdks'], { encoding: 'utf-8' })
-    if (childProc.error) {
-      return false
-    }
-
-    const lines = childProc.stdout.split('\n').filter((line: string) => !!line)
-    const lastLine = lines[lines.length - 1]
-    let latestMajorVersion: number
-    try {
-      latestMajorVersion = parseInt(lastLine.substring(0, lastLine.indexOf('.')))
-    } catch {
-      throw Error('error parsing results of dotnet --list-sdks')
-    }
-
-    return latestMajorVersion >= minimumMajorVersion
+    return await hasDotnetSdkGreaterThanOrEqualTo(minimumMajorVersion)
   }
 
   protected async hasNodejsGreaterThanOrEqualTo(minimumMajorVersion: number): Promise<boolean> {
@@ -208,4 +190,31 @@ export default abstract class DependencyChecker {
       throw Error(`Platform not supported: ${rawPlatformString}. Nodejs process.platform must be win32, darwin or linux.`)
     }
   }
+}
+
+export async function hasDotnetSdkGreaterThanOrEqualTo(minimumMajorVersion: number): Promise<boolean> {
+  if (!(await which('dotnet')).location) {
+    return false
+  }
+
+  const result = await simpleSpawnAsync('dotnet', ['--list-sdks'], false)
+  if (result.code !== 0) {
+    trace(result)
+    throw new Error('Command "dotnet --list-sdks" returned a non-zero result - enable trace for error details')
+  }
+
+  if (result.stdoutLines.length === 0) {
+    throw new Error('Unexpected error running "dotnet --list-sdks" and parsing the result - empty stdout lines')
+  }
+
+  let latestMajorVersion: number
+  const lastLine = result.stdoutLines[result.stdoutLines.length - 1]
+  try {
+    latestMajorVersion = parseInt(lastLine.substring(0, lastLine.indexOf('.')))
+  } catch {
+    throw Error('error parsing results of dotnet --list-sdks')
+  }
+
+  trace(`minimumMajorVersion: ${minimumMajorVersion} | latestMajorVersion: ${latestMajorVersion}`)
+  return latestMajorVersion >= minimumMajorVersion
 }

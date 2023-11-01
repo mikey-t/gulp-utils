@@ -20,11 +20,10 @@
     "src/**/*.ts"
   ],
   "exclude": [
+    ".vscode",
+    "coverage",
     "dist",
-    "docs",
-    "playground",
     "node_modules",
-    "test",
-    "docker"
+    "test"
   ]
 }
