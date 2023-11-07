@@ -1,4 +1,4 @@
-import { log, requireString, requireValidPath, spawnAsync, trace, whichSync } from './generalUtils.js'
+import { log, requireString, requireValidPath, spawnAsync, trace, which } from './generalUtils.js'
 
 // For JSDoc link
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -36,17 +36,32 @@ export async function dotnetPublish(projectPath: string = './', configuration: s
 }
 
 /**
+ * Install or update a global dotnet tool.
+ * @param toolName The name of the dotnet global tool
+ */
+export async function installOrUpdateDotnetGlobalTool(toolName: string) {
+  if (!(await which('dotnet')).location) {
+    throw new Error('"dotnet" is not installed')
+  }
+  const installed = (await which(toolName)).location
+  if (installed) {
+    log(`${toolName} tool already installed, updating...`)
+  } else {
+    log(`${toolName} tool not installed, installing...`)
+  }
+  const args = ['tool', installed ? 'update' : 'install', '--global', toolName]
+  await spawnAsync('dotnet', args)
+}
+
+/**
  * Spawns a process that runs the necessary commands to install or update the dotnet-ef tool globally on the system.
  */
 export async function installOrUpdateDotnetEfTool() {
-  const installed = whichSync('dotnet-ef').location
-  if (installed) {
-    log('dotnet-ef tool already installed, updating...')
-  } else {
-    log('dotnet-ef tool not installed, installing...')
-  }
-  const args = ['tool', installed ? 'update' : 'install', '--global', 'dotnet-ef']
-  await spawnAsync('dotnet', args)
+  await installOrUpdateDotnetGlobalTool('dotnet-ef')
+}
+
+export async function installOrUpdateReportGeneratorTool() {
+  await installOrUpdateDotnetGlobalTool('dotnet-reportgenerator-globaltool')
 }
 
 /**

@@ -16,9 +16,11 @@
     "BAAA",
     "certpbe",
     "Dsonar",
+    "globaltool",
     "keyout",
     "lcov",
     "Qube",
+    "reportgenerator",
     "sonarqube",
     "USERPROFILE",
     "wslconfig"
