@@ -77,7 +77,7 @@ export async function efRemoveLastMigration(projectPath: string, dbContextName: 
     throw new Error(`dotnet ef migrations remove returned non-zero exit code: ${returnCode}`)
   }
 
-  log(`Removing migration SQL script files for migration if they're empty`)
+  log(`Removing migration SQL script files if they're empty`)
   await deleteScriptFileIfEmpty(getScriptPath(projectPath, lastMigrationName, true))
   await deleteScriptFileIfEmpty(getScriptPath(projectPath, lastMigrationName, false))
 }
@@ -155,17 +155,24 @@ async function getCSharpMigrationFilePath(projectDirectory: string, dbContextNam
 }
 
 async function addDbMigrationBoilerplate(projectDirectory: string, dbContextName: string, migrationName: string) {
-  const filePath = await getCSharpMigrationFilePath(projectDirectory, dbContextName, migrationName)
+  const cSharpMigrationFilePath = await getCSharpMigrationFilePath(projectDirectory, dbContextName, migrationName)
 
-  log(`Replacing file contents with boilerplate for file 📄${filePath}`)
+  log(`Replacing file contents with boilerplate for file 📄${cSharpMigrationFilePath}`)
+  
+  const oldFileContents = await fsp.readFile(cSharpMigrationFilePath, { encoding: 'utf8' })
+  const namespaceLine = oldFileContents.split('\n').find(line => line.startsWith('namespace '))?.trim()
+  if (!namespaceLine) {
+    throw new Error(`Unable to find namespace line in file: ${cSharpMigrationFilePath}`)
+  }
 
   const newFileContents = cSharpMigrationFileTemplate
+    .replaceAll(namespaceLinePlaceholder, namespaceLine)
     .replaceAll(contextNamePlaceholder, dbContextName)
     .replaceAll(migrationNamePlaceholder, migrationName)
+    
+  await fsp.writeFile(cSharpMigrationFilePath, newFileContents, { encoding: 'utf8' })
 
-  await fsp.writeFile(filePath, newFileContents, { encoding: 'utf8' })
-
-  log(`Updated file with boilerplate - please ensure it is correct: 📄${filePath}`)
+  log(`Updated file with boilerplate - please ensure it is correct: 📄${cSharpMigrationFilePath}`)
 
   const upScriptPath = path.join(projectDirectory, `Scripts/${migrationName}.sql`)
   const downScriptPath = path.join(projectDirectory, `Scripts/${migrationName}_Down.sql`)
@@ -186,6 +193,7 @@ async function writeEmptySqlFileIfNotExists(scriptPath: string, scriptType: 'Up'
   }
 }
 
+const namespaceLinePlaceholder = '{{namespace}}'
 const contextNamePlaceholder = '{{context_name}}'
 const migrationNamePlaceholder = '{{migration_name}}'
 const cSharpMigrationFileTemplate = `using Microsoft.EntityFrameworkCore.Migrations;
@@ -193,7 +201,7 @@ using MikeyT.DbMigrations;
 
 #nullable disable
 
-namespace DbMigrator.Migrations.${contextNamePlaceholder}Migrations
+{{namespace}}
 {
     public partial class ${migrationNamePlaceholder} : Migration
     {
@@ -208,5 +216,4 @@ namespace DbMigrator.Migrations.${contextNamePlaceholder}Migrations
         }
     }
 }
-
 `
