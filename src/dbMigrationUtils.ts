@@ -158,7 +158,7 @@ async function addDbMigrationBoilerplate(projectDirectory: string, dbContextName
   const cSharpMigrationFilePath = await getCSharpMigrationFilePath(projectDirectory, dbContextName, migrationName)
 
   log(`Replacing file contents with boilerplate for file 📄${cSharpMigrationFilePath}`)
-  
+
   const oldFileContents = await fsp.readFile(cSharpMigrationFilePath, { encoding: 'utf8' })
   const namespaceLine = oldFileContents.split('\n').find(line => line.startsWith('namespace '))?.trim()
   if (!namespaceLine) {
@@ -169,7 +169,7 @@ async function addDbMigrationBoilerplate(projectDirectory: string, dbContextName
     .replaceAll(namespaceLinePlaceholder, namespaceLine)
     .replaceAll(contextNamePlaceholder, dbContextName)
     .replaceAll(migrationNamePlaceholder, migrationName)
-    
+
   await fsp.writeFile(cSharpMigrationFilePath, newFileContents, { encoding: 'utf8' })
 
   log(`Updated file with boilerplate - please ensure it is correct: 📄${cSharpMigrationFilePath}`)
@@ -187,7 +187,8 @@ async function addDbMigrationBoilerplate(projectDirectory: string, dbContextName
 
 async function writeEmptySqlFileIfNotExists(scriptPath: string, scriptType: 'Up' | 'Down') {
   if (!fs.existsSync(scriptPath)) {
-    await fsp.writeFile(scriptPath, '', { encoding: 'utf8' })
+    const filename = path.basename(scriptPath)
+    await fsp.writeFile(scriptPath, `-- ${filename} - ${scriptType} script`, { encoding: 'utf8' })
   } else {
     log(`Skipping ${scriptType} sql script (already exists)`)
   }
