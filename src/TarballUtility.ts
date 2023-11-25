@@ -25,7 +25,7 @@ export interface TarballUtilityDependencies {
 }
 
 /**
- * This utility class exists so we can mock the `which` dependency in unit tests without resorting to libraries that hack the import system.
+ * This utility class accepts dependencies in constructor params in order to allow mocking of functions like `which` in unit tests without resorting to hacking the import system.
  */
 export class TarballUtility {
   private whichSyncFn: typeof whichSync
@@ -117,7 +117,7 @@ export class TarballUtility {
     if (unpackedDirExists && !this.isDirectory(unpackDirectory)) {
       throw new Error(`unpackDirectory exists but is not a directory: ${unpackDirectory}`)
     }
-    
+
     if (mergedOptions.createDirIfNotExists && !unpackedDirExists) {
       await this.tryCreateDirectory(unpackDirectory)
     }

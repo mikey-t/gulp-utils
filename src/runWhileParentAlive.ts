@@ -63,7 +63,7 @@ function isParentProcessAlive(parentId: number) {
     } else {
       console.error(err)
     }
-    traceAndLog(`Error attempting to fetch task list using 'tasklist' - returning false for isParentAlive(): ${err instanceof Error ? err.toString() : err}`)
+    traceAndLog(`Error attempting to get task list using 'tasklist' - returning false for isParentAlive(): ${err instanceof Error ? err.toString() : err}`)
     return false
   }
 }

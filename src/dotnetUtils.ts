@@ -4,6 +4,8 @@ import { log, requireString, requireValidPath, spawnAsync, trace, which } from '
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import type { SpawnError } from './generalUtils.js'
 
+export { getLatestNugetPackageVersion } from './NugetUtility.js'
+
 /**
  * Runs dotnet build on the specified project.
  * @param projectPath Path to project file (like .csproj) or directory of project to build

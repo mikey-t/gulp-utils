@@ -1,6 +1,6 @@
 {
   "name": "@mikeyt23/node-cli-utils",
-  "version": "2.0.17",
+  "version": "2.0.18",
   "description": "Some node cli utility functions",
   "author": "Mike Thompson",
   "license": "MIT",
@@ -53,16 +53,6 @@
       "require": {
         "types": "./dist/cjs/dotnetUtils.d.ts",
         "default": "./dist/cjs/dotnetUtils.js"
-      }
-    },
-    "./dbMigrationUtils": {
-      "import": {
-        "types": "./dist/esm/dbMigrationUtils.d.ts",
-        "default": "./dist/esm/dbMigrationUtils.js"
-      },
-      "require": {
-        "types": "./dist/cjs/dbMigrationUtils.d.ts",
-        "default": "./dist/cjs/dbMigrationUtils.js"
       }
     },
     "./colors": {

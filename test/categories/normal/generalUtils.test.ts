@@ -1,9 +1,9 @@
 import assert from 'node:assert'
 import path from 'node:path'
 import { describe, it } from 'node:test'
-import { config } from '../src/NodeCliUtilsConfig.js'
-import { conditionallyAsync, getRandomIntInclusive, humanizeTime, isChildPath, requireString, spawnAsync, toWslPath, which, whichSync } from '../src/generalUtils.js'
-import { assertErrorMessageEquals, assertErrorMessageStartsWith, fixturesDir, only } from '../src/testUtils.js'
+import { config } from '../../../src/NodeCliUtilsConfig.js'
+import { conditionallyAsync, getRandomIntInclusive, humanizeTime, isChildPath, requireString, spawnAsync, toWslPath, which, whichSync } from '../../../src/generalUtils.js'
+import { assertErrorMessageEquals, assertErrorMessageStartsWith, fixturesDir } from '../../../src/testUtils.js'
 
 config.traceEnabled = false
 
@@ -210,7 +210,7 @@ describe('getRandomIntInclusive', () => {
   })
 })
 
-describe('isChildPath', only, () => {
+describe('isChildPath', () => {
   it('should return true for relative paths and child is subdirectory of parentDir', () => {
     const parentDir = childPathCheckParentDirRelative
     const child = `${childPathCheckParentDirRelative}/child`
@@ -295,13 +295,13 @@ describe('isChildPath', only, () => {
       err => assertErrorMessageEquals(err, 'The child path passed does not exist and requireChildExists was set to true')
     )
   })
-  it('throws if parentDir does not exist', only, () => {
+  it('throws if parentDir does not exist', () => {
     assert.throws(
       () => isChildPath('./test/fixtures/does-not-exist', './test/fixtures/isChildPathTest/child'),
       err => assertErrorMessageStartsWith(err, 'Invalid or nonexistent path provided')
     )
   })
-  it('throws if parentDir is not a directory', only, () => {
+  it('throws if parentDir is not a directory', () => {
     assert.throws(
       () => isChildPath('./test/fixtures/isChildPathTest/parent/placeholder.txt', './test/fixtures/isChildPathTest/parent/placeholder.txt/child'),
       err => assertErrorMessageEquals(err, 'The parentDir param must be an existing directory')

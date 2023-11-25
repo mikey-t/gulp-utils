@@ -6,7 +6,6 @@
     "all": true,
     "include": [
         "src/certUtils.ts",
-        "src/dbMigrationUtils.ts",
         "src/DependencyChecker.ts",
         "src/dockerUtils.ts",
         "src/dotnetUtils.ts",
@@ -16,6 +15,7 @@
         "src/hostFileUtils.ts",
         "src/NodeCliUtilsConfig.ts",
         "src/parallel.ts",
-        "src/TarballUtility.ts"
+        "src/TarballUtility.ts",
+        "src/NugetUtility.ts"
     ]
 }

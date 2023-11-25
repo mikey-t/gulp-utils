@@ -1,9 +1,10 @@
+// "other" reason: tests are slow and rely on being run from an elevated prompt on windows
 import assert from 'node:assert'
 import fsp from 'node:fs/promises'
 import path from 'node:path'
 import { beforeEach, describe, it } from 'node:test'
-import { GenerateCertOptions, generateCertWithOpenSsl, winCertIsInstalled, winGetPfxInfo, winInstallCert, winUninstallCert } from '../src/certUtils.js'
-import { assertErrorMessageIncludes, ensureEmptyTempDir, fileExistsAndIsNonZero, tempDir } from '../src/testUtils.js'
+import { GenerateCertOptions, generateCertWithOpenSsl, winCertIsInstalled, winGetPfxInfo, winInstallCert, winUninstallCert } from '../../../src/certUtils.js'
+import { assertErrorMessageIncludes, ensureEmptyTempDir, fileExistsAndIsNonZero, tempDir } from '../../../src/testUtils.js'
 
 const certTempDir = path.join(tempDir, 'cert-test')
 const shouldLog = false

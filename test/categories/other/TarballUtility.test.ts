@@ -1,12 +1,13 @@
+// "other" reason: tests are slow due to spawning of system version of "tar"
 import assert from 'node:assert'
 import fs from 'node:fs'
 import fsp from 'node:fs/promises'
 import path, { join } from 'node:path'
 import { beforeEach, describe, it } from 'node:test'
-import { whichSync, WhichResult, mkdirp, spawnAsync, SpawnResult } from '../src/generalUtils.js'
-import { TarballUtility } from '../src/TarballUtility.js'
-import { assertErrorMessageStartsWith, ensureEmptyTempDir, fileExistsAndIsNonZero, fixturesDir, tempDir } from '../src/testUtils.js'
-import { config } from '../src/NodeCliUtilsConfig.js'
+import { whichSync, WhichResult, mkdirp, spawnAsync, SpawnResult } from '../../../src/generalUtils.js'
+import { TarballUtility } from '../../../src/TarballUtility.js'
+import { assertErrorMessageStartsWith, ensureEmptyTempDir, fileExistsAndIsNonZero, fixturesDir, tempDir } from '../../../src/testUtils.js'
+import { config } from '../../../src/NodeCliUtilsConfig.js'
 
 config.traceEnabled = false
 

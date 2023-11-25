@@ -4,6 +4,8 @@ import fsp from 'node:fs/promises'
 import path from 'node:path'
 import { config } from './NodeCliUtilsConfig.js'
 import { ExtendedError, SimpleSpawnError, SimpleSpawnResult, SpawnError, SpawnOptionsWithThrow, SpawnResult, StringKeyedDictionary, WhichResult, isErrorEnoent, isPlatformWindows, log, requireString, requireValidPath, simpleSpawnAsync, sortDictionaryByKeyAsc, spawnAsync, stringToNonEmptyLines, stripShellMetaCharacters, trace } from './generalUtils.js'
+import http from 'node:http'
+import https from 'node:https'
 
 const isCommonJS = typeof require === "function" && typeof module === "object" && module.exports
 const isEsm = !isCommonJS
@@ -138,7 +140,7 @@ const setDefaultsAndMergeOptions = (options?: Partial<SpawnOptionsInternal>): Sp
   if (options?.cwd && !fs.existsSync(options.cwd)) {
     throw new Error(`The cwd path provided does not exist: ${options.cwd}`)
   }
-  
+
   const defaultSpawnOptions: SpawnOptionsInternal = { stdio: 'inherit', isLongRunning: false, throwOnNonZero: false }
   return { ...defaultSpawnOptions, ...options }
 }
@@ -353,4 +355,38 @@ export async function throwIfDockerNotReady() {
   } else {
     await simpleSpawnAsync('docker', ['info'])
   }
+}
+
+// Using basic NodeJS http instead of fetch because:
+// - Older NodeJS versions don't have fetch built-in
+// - The new NodeJS fetch implementation seems to be buggy (sometimes crashes the entire Node process with no indication of what happened - no unhandled error or rejection events are even triggered)
+let keepAliveAgent: https.Agent
+interface HttpResponse {
+  status: number
+  body: string
+  ok: boolean
+}
+export function httpGet(url: string, headers?: StringKeyedDictionary): Promise<HttpResponse> {
+  if (keepAliveAgent === undefined) {
+    keepAliveAgent = new https.Agent({ keepAlive: true })
+  }
+  return new Promise((resolve, reject) => {
+    const lib = url.startsWith('https') ? https : http
+
+    lib.get(url, { headers: headers ?? {} }, (response) => {
+      let data = ''
+      response.on('data', (chunk) => {
+        data += chunk
+      })
+      response.on('end', () => {
+        resolve({
+          status: response.statusCode ?? 0,
+          body: data,
+          ok: response.statusCode === 200
+        })
+      })
+    }).on('error', (err) => {
+      reject(err)
+    })
+  })
 }

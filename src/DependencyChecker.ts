@@ -64,12 +64,7 @@ export abstract class DependencyChecker {
   }
 
   protected async winHasElevatedPerms(): Promise<boolean> {
-    try {
-      await spawnAsync('net', ['session'], { throwOnNonZero: true, stdio: 'ignore' })
-      return true
-    } catch {
-      return false
-    }
+    return await winHasElevatedPerms()
   }
 
   protected async linuxHasElevatedPerms(): Promise<boolean> {
@@ -217,4 +212,16 @@ export async function hasDotnetSdkGreaterThanOrEqualTo(minimumMajorVersion: numb
 
   trace(`minimumMajorVersion: ${minimumMajorVersion} | latestMajorVersion: ${latestMajorVersion}`)
   return latestMajorVersion >= minimumMajorVersion
+}
+
+export async function winHasElevatedPerms(): Promise<boolean> {
+  if (!isPlatformWindows()) {
+    throw new Error(`This method can only check for elevated permissions on Windows`)
+  }
+  try {
+    await spawnAsync('net', ['session'], { throwOnNonZero: true, stdio: 'ignore' })
+    return true
+  } catch {
+    return false
+  }
 }

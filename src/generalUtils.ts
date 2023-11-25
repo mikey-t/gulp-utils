@@ -665,7 +665,7 @@ export async function deleteEnvIfExists(envPath: string) {
 
 export interface FindFilesOptions {
   maxDepth: number
-  excludeDirectoryNames: string[],
+  directoryNamesToSkip: string[],
   returnForwardSlashRelativePaths: boolean
 }
 
@@ -680,7 +680,7 @@ export interface FindFilesOptions {
 export async function findFilesRecursively(dir: string, filenamePattern: string, options?: Partial<FindFilesOptions>): Promise<string[]> {
   validateFindFilesRecursivelyParams(dir, filenamePattern)
 
-  const defaultOptions: FindFilesOptions = { maxDepth: 5, excludeDirectoryNames: [], returnForwardSlashRelativePaths: false }
+  const defaultOptions: FindFilesOptions = { maxDepth: 5, directoryNamesToSkip: [], returnForwardSlashRelativePaths: false }
   const mergedOptions = { ...defaultOptions, ...options }
 
   // Convert the pattern to a regex
@@ -699,7 +699,7 @@ export async function findFilesRecursively(dir: string, filenamePattern: string,
 
       if (entry.isDirectory()) {
         // Check if directory is in the exclude list
-        if (!mergedOptions.excludeDirectoryNames?.includes(entry.name)) {
+        if (!mergedOptions.directoryNamesToSkip?.includes(entry.name)) {
           await searchDirectory(fullPath, depth + 1)
         }
       } else if (entry.isFile() && regex.test(entry.name)) {
@@ -920,23 +920,29 @@ export function getRequiredEnvVar(varName: string, throwOnEmpty = true): string 
 }
 
 export function getNormalizedError(err: unknown): Error {
-  let lastErrorAsError: Error
-  if (err === undefined || err === null) {
-    lastErrorAsError = new Error('lastError was undefined or null')
+  if (err instanceof Error) {
+    return err
+  }
+
+  let normalizedError: Error
+  if (err === undefined) {
+    normalizedError = new Error('error was undefined')
+  } else if (err === null) {
+    normalizedError = new Error('error was null')
   } else if (err instanceof Error) {
-    lastErrorAsError = err
+    normalizedError = err
   } else if (typeof err === 'string') {
-    lastErrorAsError = new Error(err)
+    normalizedError = new Error(err)
   } else if (err instanceof Object) {
     try {
-      lastErrorAsError = new Error(JSON.stringify(err))
+      normalizedError = new Error(JSON.stringify(err))
     } catch (jsonError) {
-      lastErrorAsError = new Error('Object could not be serialized - could not normalize')
+      normalizedError = new Error('Object could not be serialized - could not normalize')
     }
   } else {
-    lastErrorAsError = new Error(`Unknown error of type ${typeof err} - could not normalize`)
+    normalizedError = new Error(`Unknown error of type ${typeof err} - could not normalize`)
   }
-  return lastErrorAsError
+  return normalizedError
 }
 
 /** Options for {@link withRetryAsync}. */
@@ -1309,4 +1315,31 @@ export function isChildPath(parentDir: string, child: string, requireChildExists
     childPath !== parentPath &&
     childPath.startsWith(parentPath + path.sep)
   )
+}
+
+/**
+ * Returns `true` if `value` is a string that contains only digits (regex used: `/^\d+$/`).
+ */
+export function hasOnlyDigits(value: string) {
+  if (!value || typeof value !== 'string') {
+    return false
+  }
+  return /^\d+$/.test(value)
+}
+
+/**
+ * @param input A string to search.
+ * @param substring The substring to find indexes for.
+ * @returns An array of numbers representing the indexes for the substring within the input string.
+ */
+export function findAllIndexes(input: string, substring: string): number[] {
+  const indexes: number[] = []
+  let index = input.indexOf(substring)
+
+  while (index !== -1) {
+    indexes.push(index)
+    index = input.indexOf(substring, index + 1)
+  }
+
+  return indexes
 }

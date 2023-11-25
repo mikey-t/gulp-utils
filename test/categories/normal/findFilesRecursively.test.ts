@@ -1,7 +1,7 @@
 import assert from 'node:assert'
 import { join, resolve } from 'node:path'
 import { describe, it } from 'node:test'
-import { findFilesRecursively } from '../src/generalUtils.js'
+import { findFilesRecursively } from '../../../src/generalUtils.js'
 
 const searchDir = './test/fixtures/search-dir'
 
@@ -76,7 +76,7 @@ describe('findFilesRecursively', () => {
 
   it('respects the excludeDirNames option', async () => {
     const excludeDirNames = ['dirA', 'dirBAA']
-    const matches = await findFilesRecursively(searchDir, '*.test.ts', { excludeDirectoryNames: excludeDirNames })
+    const matches = await findFilesRecursively(searchDir, '*.test.ts', { directoryNamesToSkip: excludeDirNames })
     const expectedMatches = [
       join(BASE_DIR, 'first-level.test.ts'),
       join(BASE_DIR, 'dirB/second-levelB.test.ts'),

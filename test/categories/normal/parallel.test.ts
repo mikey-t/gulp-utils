@@ -1,9 +1,9 @@
 import assert from 'node:assert'
 import { describe, it } from 'node:test'
-import { config as nodeCliUtilsConfig } from '../src/NodeCliUtilsConfig.js'
-import { sleep, trace } from '../src/generalUtils.js'
-import { ParallelResult, runParallel } from '../src/parallel.js'
-import { assertErrorMessageEquals } from '../src/testUtils.js'
+import { config as nodeCliUtilsConfig } from '../../../src/NodeCliUtilsConfig.js'
+import { sleep, trace } from '../../../src/generalUtils.js'
+import { ParallelResult, runParallel } from '../../../src/parallel.js'
+import { assertErrorMessageEquals } from '../../../src/testUtils.js'
 
 // Change vars temporarily to experiment with different scenarios
 nodeCliUtilsConfig.traceEnabled = false
