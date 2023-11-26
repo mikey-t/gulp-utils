@@ -1,7 +1,7 @@
-import chalk from 'chalk'
 import * as net from 'net'
 import { spawnSync } from 'node:child_process'
 import { platform as rawPlatformString } from 'node:process'
+import { green, red } from './colors.js'
 import { isDockerRunning } from './dockerUtils.js'
 import { isPlatformLinux, isPlatformMac, isPlatformWindows, simpleSpawnAsync, spawnAsync, trace, which, whichSync } from './generalUtils.js'
 
@@ -45,7 +45,7 @@ export abstract class DependencyChecker {
 
     for (const { key, value } of filteredReport) {
       const padding = ' '.repeat(longestKeyLength - key.length)
-      reportString += `${key}${padding}: ${value ? chalk.green('true') : chalk.red('false')}\n`
+      reportString += `${key}${padding}: ${value ? green('true') : red('false')}\n`
     }
 
     return reportString
