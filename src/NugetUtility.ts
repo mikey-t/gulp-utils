@@ -1,3 +1,4 @@
+import { isTargetFrameworkMonikerGreaterThanOrEqualToNet5 } from './dotnetUtilsInternal.js'
 import { findAllIndexes, requireString, trace } from './generalUtils.js'
 import { httpGet } from './generalUtilsInternal.js'
 
@@ -28,15 +29,15 @@ export class NugetUtility {
   /**
    * Get the newest version number for the nuget package that is compatible with the specified .net version.
    * @param packageName The nuget package name to evaluate.
-   * @param frameworkVersionMoniker The .net framework version, for example "net6.0" or "net8.0"
+   * @param targetFrameworkMoniker The .net framework version, for example "net6.0" or "net8.0"
    * @returns A version string for the latest nuget package that is compatible with the specified .net framework, or `null` if there wasn't a compatible version found.
    * @throws If the package does not exist.
    * @throws If the nuget API is unreachable.
    * @throws If the nuget.org package landing page is unreachable or it's html format for compatible .net frameworks changes.
    */
-  getLatestNugetPackageVersion = async (packageName: string, frameworkVersionMoniker: string): Promise<string | null> => {
+  getLatestNugetPackageVersion = async (packageName: string, targetFrameworkMoniker: string): Promise<string | null> => {
     this.validatePackageName(packageName)
-    this.validateFrameworkVersion(frameworkVersionMoniker)
+    this.validateFrameworkVersion(targetFrameworkMoniker)
 
     const allVersionsJson = await this.nugetAccessor.getAllVersionsJson(packageName)
     const allNugetVersions = this.getAllNugetVersionsFromJson(packageName, allVersionsJson)
@@ -47,7 +48,7 @@ export class NugetUtility {
       const landingPageUrl = NugetUtility.getNugetLandingPageUrl(packageName, majorVersion.raw)
       const landingPageHtml = await this.nugetAccessor.getPackageLandingPageHtml(packageName, majorVersion.raw)
       const compatibleFrameworks = this.extractCompatibleFrameworks(landingPageHtml, landingPageUrl)
-      if (compatibleFrameworks.some(f => f.targetFrameworkMoniker === frameworkVersionMoniker)) {
+      if (compatibleFrameworks.some(f => f.targetFrameworkMoniker === targetFrameworkMoniker)) {
         return majorVersion.raw
       }
     }
@@ -63,11 +64,9 @@ export class NugetUtility {
     }
   }
 
-  private validateFrameworkVersion(frameworkVersionMoniker: string) {
-    requireString('frameworkVersionMoniker', frameworkVersionMoniker)
-    const netFormatPattern = /^net([5-9]|\d{2,})\.\d+$/
-    if (!netFormatPattern.test(frameworkVersionMoniker)) {
-      throw new Error(`Invalid frameworkVersionMoniker (currently only supports "net5.0" and above): ${frameworkVersionMoniker}`)
+  private validateFrameworkVersion(targetFrameworkMoniker: string) {
+    if (!isTargetFrameworkMonikerGreaterThanOrEqualToNet5(targetFrameworkMoniker)) {
+      throw new Error(`Invalid targetFrameworkMoniker (currently only supports "net5.0" and above): ${targetFrameworkMoniker}`)
     }
   }
 

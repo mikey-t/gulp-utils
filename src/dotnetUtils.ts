@@ -5,6 +5,7 @@ import { log, requireString, requireValidPath, spawnAsync, trace, which } from '
 import type { SpawnError } from './generalUtils.js'
 
 export { getLatestNugetPackageVersion } from './NugetUtility.js'
+export { isTargetFrameworkMonikerGreaterThanOrEqualToNet5 } from './dotnetUtilsInternal.js'
 
 /**
  * Runs dotnet build on the specified project.
