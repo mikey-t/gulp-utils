@@ -49,3 +49,9 @@ export function assertErrorMessageEquals(err: unknown, expected: string) {
   assert.strictEqual(err.message, expected, `Error message did not equal the expected value. Actual: "${err.message}".`)
   return true
 }
+
+export function logWithDividers(data: unknown, ...moreData: unknown[]) {
+  console.log('================')
+  console.log(data, ...moreData)
+  console.log('================')
+}

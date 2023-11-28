@@ -57,7 +57,7 @@ Test category params:
 | Param | Notes |
 | ----- | ----- |
 | `n` | Normal tests. These will also be run if no other tests are specified. |
-| `i` | Integration tests. These will make live http calls to third parties. |
+| `i` | Integration tests. These will make live http calls to third parties and run real system commands. |
 | `tar` | Tarball tests that call actual system tar command. Adds 5-10 seconds. |
 | `cert` | Cert tests. ⚠️Requires windows elevated prompt. ⚠️Windows only. Adds 20+ seconds. |
 

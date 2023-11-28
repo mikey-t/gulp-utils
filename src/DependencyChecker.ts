@@ -187,12 +187,15 @@ export abstract class DependencyChecker {
   }
 }
 
+/**
+ * @deprecated Use dotnetUtils methods: `getInstalledSdkVersions`, `isSdkMajorVersionInstalled`, `isSdkMajorVersionOrGreaterInstalled`
+ */
 export async function hasDotnetSdkGreaterThanOrEqualTo(minimumMajorVersion: number): Promise<boolean> {
   if (!(await which('dotnet')).location) {
     return false
   }
 
-  const result = await simpleSpawnAsync('dotnet', ['--list-sdks'], false)
+  const result = await simpleSpawnAsync('dotnet', ['--list-sdks'], { throwOnNonZero: false })
   if (result.code !== 0) {
     trace(result)
     throw new Error('Command "dotnet --list-sdks" returned a non-zero result - enable trace for error details')

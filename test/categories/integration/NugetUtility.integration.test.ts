@@ -1,6 +1,6 @@
 import assert from 'node:assert'
 import { describe, it } from 'node:test'
-import { getLatestNugetPackageVersion } from '../../../src/dotnetUtils.js'
+import { TargetFrameworkMoniker, getLatestNugetPackageVersion } from '../../../src/dotnetUtils.js'
 import { StringKeyedDictionary } from '../../../src/generalUtils.js'
 
 interface PackageExpectedVersionInfo {
@@ -34,7 +34,7 @@ for (const packageInfo of packages) {
     for (const netVersion of Object.keys(packageInfo.versionMap)) {
       const expectedPackageVersionMajor = packageInfo.versionMap[netVersion]
       it(`returns ${expectedPackageVersionMajor} as the major version for .net version ${netVersion}`, async () => {
-        const version = await getLatestNugetPackageVersion(packageInfo.packageName, netVersion)
+        const version = await getLatestNugetPackageVersion(packageInfo.packageName, netVersion as TargetFrameworkMoniker)
 
         assert.notStrictEqual(version, null, `null should not be returned for .net version ${netVersion}`)
         assert.strictEqual(version!.length > 0, true, `result was empty for .net version ${netVersion}`)

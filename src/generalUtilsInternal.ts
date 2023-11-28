@@ -1,11 +1,11 @@
 import { ChildProcess, spawn, spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import fsp from 'node:fs/promises'
+import http from 'node:http'
+import https from 'node:https'
 import path from 'node:path'
 import { config } from './NodeCliUtilsConfig.js'
 import { ExtendedError, SimpleSpawnError, SimpleSpawnResult, SpawnError, SpawnOptionsWithThrow, SpawnResult, StringKeyedDictionary, WhichResult, isErrorEnoent, isPlatformWindows, log, requireString, requireValidPath, simpleSpawnAsync, sortDictionaryByKeyAsc, spawnAsync, stringToNonEmptyLines, stripShellMetaCharacters, trace } from './generalUtils.js'
-import http from 'node:http'
-import https from 'node:https'
 
 const isCommonJS = typeof require === "function" && typeof module === "object" && module.exports
 const isEsm = !isCommonJS
@@ -264,10 +264,11 @@ export function validateFindFilesRecursivelyParams(dir: string, filenamePattern:
   }
 }
 
-export function simpleSpawnSyncInternal(command: string, args?: string[], throwOnNonZero: boolean = true, useCmd: boolean = false): SimpleSpawnResult {
+export function simpleSpawnSyncInternal(command: string, args?: string[], throwOnNonZero: boolean = true, cwd: string = process.cwd(), useCmd: boolean = false): SimpleSpawnResult {
   requireString('command', command)
+  requireValidPath('cwd', cwd)
 
-  const result = spawnSync(command, args ?? [], { encoding: 'utf-8', shell: useCmd ? 'cmd.exe' : false })
+  const result = spawnSync(command, args ?? [], { encoding: 'utf-8', shell: useCmd ? 'cmd.exe' : false, cwd: cwd })
 
   const spawnResult: SimpleSpawnResult = {
     code: result.status ?? 1,
@@ -285,10 +286,11 @@ export function simpleSpawnSyncInternal(command: string, args?: string[], throwO
   return spawnResult
 }
 
-export async function simpleSpawnAsyncInternal(command: string, args?: string[], throwOnNonZero: boolean = true, useCmd: boolean = false): Promise<SimpleSpawnResult> {
+export async function simpleSpawnAsyncInternal(command: string, args?: string[], throwOnNonZero: boolean = true, cwd: string = process.cwd(), useCmd: boolean = false): Promise<SimpleSpawnResult> {
   requireString('command', command)
+  requireValidPath('cwd', cwd)
 
-  const result = await spawnAsync(command, args, { stdio: 'pipe', shell: useCmd ? 'cmd.exe' : false })
+  const result = await spawnAsync(command, args, { stdio: 'pipe', shell: useCmd ? 'cmd.exe' : false, cwd: cwd })
 
   const spawnResult: SimpleSpawnResult = {
     code: result.code,
@@ -296,7 +298,7 @@ export async function simpleSpawnAsyncInternal(command: string, args?: string[],
     stderr: result.stderr,
     stdoutLines: stringToNonEmptyLines(result.stdout),
     error: result.error,
-    cwd: process.cwd()
+    cwd: cwd
   }
 
   if (spawnResult.code !== 0 && throwOnNonZero) {

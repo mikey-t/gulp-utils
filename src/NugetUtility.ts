@@ -1,9 +1,23 @@
-import { isTargetFrameworkMonikerGreaterThanOrEqualToNet5 } from './dotnetUtilsInternal.js'
-import { findAllIndexes, requireString, trace } from './generalUtils.js'
-import { httpGet } from './generalUtilsInternal.js'
+import axios, { AxiosInstance, AxiosResponse } from 'axios'
+import { DotnetVersion } from './DotnetVersion.js'
+import { TargetFrameworkMoniker, isValidTargetFrameworkMoniker } from './dotnetUtils.js'
+import { ExtendedError, findAllIndexes, getNormalizedError, requireString, sleep, trace } from './generalUtils.js'
+
+type NugetVersionCompatibilityList = { [packageName: string]: { [T in TargetFrameworkMoniker]?: number } }
+
+/**
+ * List of known compatible major package versions with respect to dotnet framework version.
+ */
+export const nugetPackageCompatibilityList: NugetVersionCompatibilityList = {
+  'Microsoft.EntityFrameworkCore': { 'net6.0': 7, 'net7.0': 7, 'net8.0': 8 },
+  'Microsoft.EntityFrameworkCore.Design': { 'net6.0': 7, 'net7.0': 7, 'net8.0': 8 },
+  'Microsoft.EntityFrameworkCore.Relational': { 'net6.0': 7, 'net7.0': 7, 'net8.0': 8 },
+  'Npgsql.EntityFrameworkCore.PostgreSQL': { 'net6.0': 7, 'net7.0': 7, 'net8.0': 8 },
+  'dotnet-ef': { 'net6.0': 7, 'net7.0': 7, 'net8.0': 8 }
+}
 
 export interface NugetUtilityDependencies {
-  nugetAccessor: NugetAccessor
+  nugetAccessor: INugetAccessor
 }
 
 export class NugetUtility {
@@ -27,7 +41,31 @@ export class NugetUtility {
   }
 
   /**
-   * Get the newest version number for the nuget package that is compatible with the specified .net version.
+   * Same as {@link getLatestNugetPackageVersion}, except it first pulls from a hard-coded list, and only if it isn't found will it reach out to nuget.org to screen
+   * scrape and use their best guess. Only returns the major version - use it to import a package with wildcard syntax, for example: `dotnet add package SomePackage -v 7.*`.
+   * 
+   * Useful for packages like the EntityFramework that is technically compatible with versions of .net that they actually don't work with because of runtime
+   * dependencies of the dotnet-ef tool.
+   */
+  getLatestMajorNugetPackageVersion = async (packageName: string, targetFrameworkMoniker: TargetFrameworkMoniker): Promise<number | null> => {
+    trace(`checking the hard-coded list for package ${packageName}`)
+    if (Object.keys(nugetPackageCompatibilityList).includes(packageName) && Object.keys(nugetPackageCompatibilityList[packageName]).includes(targetFrameworkMoniker)) {
+      return nugetPackageCompatibilityList[packageName][targetFrameworkMoniker]!
+    }
+    trace(`package ${packageName} not found in hard-coded list - calling getLatestNugetPackageVersion`)
+    const latestVersion = await this.getLatestNugetPackageVersion(packageName, targetFrameworkMoniker)
+    if (latestVersion === null) {
+      return null
+    }
+    return new DotnetVersion(latestVersion).major
+  }
+
+  /**
+   * Get the newest version number for the nuget package that is compatible with the specified .net version. This logic scrapes nuget.org to take a guess. Note that
+   * that's all it is - a guess. Nuget doesn't actually know anything about compatibility and is also taking giant guesses based on package transitive dependencies
+   * and general compatibilities between framework versions. Nuget does not actually guarantee any type of real compatibility in any sense of the word - it just pulls
+   * the latest version when you add a package unless you specify one, and you won't know if it's compatible until a restore or build command happens. This method is
+   * an attempt to at least use the nuget.org guess instead of just using the latest version.
    * @param packageName The nuget package name to evaluate.
    * @param targetFrameworkMoniker The .net framework version, for example "net6.0" or "net8.0"
    * @returns A version string for the latest nuget package that is compatible with the specified .net framework, or `null` if there wasn't a compatible version found.
@@ -35,7 +73,7 @@ export class NugetUtility {
    * @throws If the nuget API is unreachable.
    * @throws If the nuget.org package landing page is unreachable or it's html format for compatible .net frameworks changes.
    */
-  getLatestNugetPackageVersion = async (packageName: string, targetFrameworkMoniker: string): Promise<string | null> => {
+  getLatestNugetPackageVersion = async (packageName: string, targetFrameworkMoniker: TargetFrameworkMoniker): Promise<string | null> => {
     this.validatePackageName(packageName)
     this.validateFrameworkVersion(targetFrameworkMoniker)
 
@@ -45,18 +83,18 @@ export class NugetUtility {
     const sortedVersions = [...mostRecentMajorVersions].sort((a, b) => b.major - a.major)
 
     for (const majorVersion of sortedVersions) {
-      const landingPageUrl = NugetUtility.getNugetLandingPageUrl(packageName, majorVersion.raw)
-      const landingPageHtml = await this.nugetAccessor.getPackageLandingPageHtml(packageName, majorVersion.raw)
+      const landingPageUrl = NugetUtility.getNugetLandingPageUrl(packageName, majorVersion.full)
+      const landingPageHtml = await this.nugetAccessor.getPackageLandingPageHtml(packageName, majorVersion.full)
       const compatibleFrameworks = this.extractCompatibleFrameworks(landingPageHtml, landingPageUrl)
       if (compatibleFrameworks.some(f => f.targetFrameworkMoniker === targetFrameworkMoniker)) {
-        return majorVersion.raw
+        return majorVersion.full
       }
     }
 
     return null
   }
 
-  private validatePackageName(packageName: string) {
+  validatePackageName(packageName: string) {
     requireString('packageName', packageName)
     const validNugetPattern = /^[a-zA-Z0-9_.-]+$/
     if (!validNugetPattern.test(packageName)) {
@@ -65,8 +103,8 @@ export class NugetUtility {
   }
 
   private validateFrameworkVersion(targetFrameworkMoniker: string) {
-    if (!isTargetFrameworkMonikerGreaterThanOrEqualToNet5(targetFrameworkMoniker)) {
-      throw new Error(`Invalid targetFrameworkMoniker (currently only supports "net5.0" and above): ${targetFrameworkMoniker}`)
+    if (!isValidTargetFrameworkMoniker(targetFrameworkMoniker)) {
+      throw new Error(`Invalid targetFrameworkMoniker: ${targetFrameworkMoniker}. See https://learn.microsoft.com/en-us/dotnet/standard/frameworks.`)
     }
   }
 
@@ -176,7 +214,7 @@ export class NugetUtility {
     try {
       parsedJson = JSON.parse(jsonString)
     } catch (error) {
-      throw new Error('Could not parse Nuget response - invalid JSON string')
+      throw new Error(`Could not parse Nuget response - invalid JSON string: ${jsonString}`)
     }
 
     if (!Array.isArray(parsedJson.versions)) {
@@ -202,16 +240,14 @@ export interface NugetFrameworkCompatibility {
  */
 export class NugetVersion {
   packageName: string
-  raw: string
+  full: string
   major: number
   minor: number
   patch: number
-  suffix: string | undefined
+  suffix?: string
 
   constructor(packageName: string, version: string) {
-    if (version === undefined || typeof version !== 'string' || version.trim() !== version || version === '' || version.includes(' ')) {
-      this.throwGenericError()
-    }
+    const dotnetVersion = new DotnetVersion(version)
     if (!packageName || packageName.trim() !== packageName || packageName === '') {
       this.throwGenericError(`invalid package name: ${packageName}`)
     }
@@ -220,22 +256,11 @@ export class NugetVersion {
       this.throwGenericError(`url encoded package name is does not match the packageName: ${packageName}`)
     }
     this.packageName = urlEncodedPackageName
-    this.raw = version
-    const firstDashIndex = version.indexOf('-')
-    const hasSuffix = firstDashIndex !== -1
-
-    if (hasSuffix) {
-      if (firstDashIndex === version.length - 1) {
-        this.throwGenericError('ends with dash symbol')
-      }
-      this.suffix = version.substring(firstDashIndex + 1)
-    }
-
-    const versionWithoutSuffix = hasSuffix ? version.substring(0, firstDashIndex) : version
-    const parts = versionWithoutSuffix.split('.')
-    this.major = this.getNumOrThrow(parts[0])
-    this.minor = parts.length > 1 ? this.getNumOrThrow(parts[1]) : 0
-    this.patch = parts.length > 2 ? this.getNumOrThrow(parts[2]) : 0
+    this.full = version
+    this.major = dotnetVersion.major
+    this.minor = dotnetVersion.minor
+    this.patch = dotnetVersion.patch
+    this.suffix = dotnetVersion.suffix
   }
 
   /**
@@ -254,17 +279,9 @@ export class NugetVersion {
     return this.patch > otherVersion.patch
   }
 
-  private getNumOrThrow = (part: string): number => {
-    const parsed = parseInt(part, 10)
-    if (isNaN(parsed)) {
-      this.throwGenericError(`"${part}" is not a number`)
-    }
-    return parsed
-  }
-
   private throwGenericError = (reason?: string) => {
     const reasonPart = reason ? ` (${reason})` : ''
-    throw new Error(`Invalid nuget version string${reasonPart}: ${this.raw}`)
+    throw new Error(`Invalid nuget version string${reasonPart}: ${this.full}`)
   }
 }
 
@@ -276,44 +293,82 @@ export interface INugetAccessor {
 
 // Important: at one point the API calls were working with PascalCase package ids, but it seems to have been changed to require all lowercase package ids now
 export class NugetAccessor implements INugetAccessor {
+  private axiosInstance: AxiosInstance
+  private readonly MAX_RETRIES = 3
+
+  constructor() {
+    this.axiosInstance = axios.create({
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36' }
+    })
+  }
+
   // Template URL: https://api.nuget.org/v3-flatcontainer/{package_id}/index.json
   // Example for EF package: https://api.nuget.org/v3-flatcontainer/microsoft.entityframeworkcore.design/index.json
-  getAllVersionsJson = async (packageName: string): Promise<string> => {
+  getAllVersionsJson = async (packageName: string, numRetries = this.MAX_RETRIES): Promise<string> => {
     const nugetVersionsUrl = NugetUtility.getVersionsJsonUrl(packageName)
     trace(`getting all package versions json from url: ${nugetVersionsUrl}`)
-    const response = await httpGet(nugetVersionsUrl)
-    if (!response.ok) {
-      throw new Error(`HTTP error code attempting to retrieve all package versions: ${response.status}`)
+    try {
+      if (numRetries < this.MAX_RETRIES) {
+        await sleep(1500)
+      }
+      const response: AxiosResponse = await this.axiosInstance.get(nugetVersionsUrl, { responseType: 'text' })
+      return response.data
+    } catch (err: unknown) {
+      if (numRetries > 0) {
+        trace(`error attempting to get json`, err)
+        trace(`trying again - num retries left: ${numRetries - 1}`)
+        return this.getAllVersionsJson(packageName, numRetries - 1)
+      }
+      throw new ExtendedError(`Error code attempting to retrieve all package versions: `, getNormalizedError(err))
     }
-    return response.body
   }
 
   // The code to calculate computed framework compatibility is quite complicated and there isn't an API endpoint. Instead of writing an entire app that
   // pulls in the NuGet.Client SDK, I'm just going to grab the html from the nuget.org landing page for the package. For reference, here is the code that computes
   // this for the nuget.org site: https://github.com/NuGet/NuGetGallery/blob/e6a38a882007374b320420645f63cc30f2a93e4d/src/NuGetGallery.Core/Services/AssetFrameworkHelper.cs
-  async getPackageLandingPageHtml(packageName: string, packageVersion: string): Promise<string> {
+  async getPackageLandingPageHtml(packageName: string, packageVersion: string, numRetries = this.MAX_RETRIES): Promise<string> {
     const nugetPackageUrl = NugetUtility.getNugetLandingPageUrl(packageName, packageVersion)
     trace(`getting nuget.org landing page html from url: ${nugetPackageUrl}`)
-    const response = await httpGet(nugetPackageUrl)
-    if (!response.ok) {
-      throw new Error(`HTTP error code for accessing ${nugetPackageUrl}: ${response.status}`)
+    try {
+      if (numRetries < this.MAX_RETRIES) {
+        await sleep(1500)
+      }
+      const response: AxiosResponse = await this.axiosInstance.get(nugetPackageUrl, { responseType: 'text' })
+      return response.data
+    } catch (err: unknown) {
+      if (numRetries > 0) {
+        trace(`error attempting to get landing page html`, err)
+        trace(`trying again - num retries left: ${numRetries - 1}`)
+        return this.getPackageLandingPageHtml(packageName, packageVersion, numRetries - 1)
+      }
+      throw new ExtendedError(`Error accessing ${nugetPackageUrl}: `, getNormalizedError(err))
     }
-    return response.body
   }
 
   // Template URL: https://api.nuget.org/v3-flatcontainer/{package_id}/{version}/{package_id}.nuspec
   // Example for EF package version 7.0.14: https://api.nuget.org/v3-flatcontainer/microsoft.entityframeworkcore.design/7.0.14/microsoft.entityframeworkcore.design.nuspec
-  async getNuspec(packageName: string, versionString: string): Promise<string> {
+  async getNuspec(packageName: string, versionString: string, numRetries = this.MAX_RETRIES): Promise<string> {
     const nugetNuspecUrl = `https://api.nuget.org/v3-flatcontainer/${packageName}/${versionString}/${packageName}.nuspec`.toLocaleLowerCase()
     trace(`getting nuspec file from url: ${nugetNuspecUrl}`)
-    const response = await httpGet(nugetNuspecUrl)
-    if (!response.ok) {
-      throw new Error(`HTTP error code attempting to get package nuspec for package "${packageName}" version "${versionString}": ${response.status}`)
+    try {
+      if (numRetries < this.MAX_RETRIES) {
+        await sleep(1500)
+      }
+      const response: AxiosResponse = await this.axiosInstance.get(nugetNuspecUrl, { responseType: 'text' })
+      return response.data
+    } catch (err: unknown) {
+      if (numRetries > 0) {
+        trace(`error attempting to get nuspec ${nugetNuspecUrl}`, err)
+        trace(`trying again - num retries left: ${numRetries - 1}`)
+        return this.getNuspec(packageName, versionString, numRetries - 1)
+      }
+      throw new ExtendedError(`Error accessing ${nugetNuspecUrl}: `, getNormalizedError(err))
     }
-    return response.body
   }
 }
 
 const defaultNugetUtility = new NugetUtility()
 
 export const getLatestNugetPackageVersion = defaultNugetUtility.getLatestNugetPackageVersion
+export const validatePackageName = defaultNugetUtility.validatePackageName
+export const getLatestMajorNugetPackageVersion = defaultNugetUtility.getLatestMajorNugetPackageVersion

@@ -17,8 +17,8 @@ const tscPath = './node_modules/typescript/lib/tsc.js'
 const eslintPath = './node_modules/eslint/bin/eslint.js'
 const typedocPath = './node_modules/typedoc/dist/lib/cli.js'
 const c8Path = './node_modules/c8/bin/c8.js'
-const loaderArgsTsx = ['--no-warnings', '--loader', 'tsx']
-const loaderArgsTsNode = ['--no-warnings', '--loader', 'ts-node/esm'] // Needed ts-node instead of tsx for more accurate test coverage
+const loaderArgsTsx = ['--no-warnings', '--import', 'tsx']
+const loaderArgsTsNode = ['--no-warnings', '--experimental-loader', 'ts-node/esm'] // Needed ts-node instead of tsx for more accurate test coverage
 const dockerComposePath = './docker-compose.yml'
 const docsProjectPath = '../node-cli-utils-docs'
 const envKeySonarToken = 'SONAR_TOKEN'
@@ -178,6 +178,13 @@ export async function sonarHealth() {
   const healthCheckUrl = `http://localhost:${sonarPort}/api/system/health`
   const response = await httpGet(healthCheckUrl, headers)
   log(response)
+}
+
+// Run "npm pack" so that consuming project's package.json can reference the tarball like this:
+// "@mikeyt23/node-cli-utils": "file:../node-cli-utils/mikeyt23-node-cli-utils-2.0.20.tgz"
+// Useful as an alternative to "npm link" for chaining multiple packages (which Volta doesn't seem to allow).
+export async function pack() {
+  await spawnAsync('npm', ['pack'], { throwOnNonZero: true })
 }
 
 async function syncEnvFile() {

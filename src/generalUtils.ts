@@ -135,10 +135,21 @@ export async function sleep(ms: number): Promise<void> {
 
 /**
  * An extension of the built-in SpawnOptions with an extra option to specify whether a non-zero exit code should throw an error.
+ * Used with method {@link spawnAsync}.
  */
 export interface SpawnOptionsWithThrow extends SpawnOptions {
   throwOnNonZero: boolean
   simpleErrorMsg?: string
+}
+
+/**
+ * Options interface for methods {@link simpleSpawnSync}, {@link simpleSpawnAsync}, {@link simpleCmdSync} and {@link simpleCmdAsync}.
+ */
+export interface SimpleSpawnOptions {
+  /** Defaults to `true`. Note that this is the opposite of the default for {@link spawnAsync}. */
+  throwOnNonZero: boolean
+  /** Optional current working directory. Defaults to `process.cwd()`. */
+  cwd: string
 }
 
 /**
@@ -381,15 +392,20 @@ export function stringToLines(str: string): string[] {
  * See {@link winInstallCert} and {@link winUninstallCert} for examples of taking user input and inserting it safely into known commands.
  * @param command Command to run
  * @param args Arguments to pass to the command
+ * @param options Optional {@link SimpleSpawnOptions} options
  * @returns An object with the status code, stdout, stderr, and error (if any)
  * @throws {@link SimpleSpawnError} if the command fails and throwOnNonZero is true
  */
-export function simpleCmdSync(command: string, args?: string[], throwOnNonZero: boolean = true): SimpleSpawnResult {
+export function simpleCmdSync(command: string, args?: string[], options?: Partial<SimpleSpawnOptions>): SimpleSpawnResult {
   if (!isPlatformWindows()) {
     throw new Error('getCmdResult is only supported on Windows')
   }
+
+  const throwOnNonZero = options?.throwOnNonZero !== undefined ? options?.throwOnNonZero : true
+  const cwd = options?.cwd ? options.cwd : process.cwd()
+
   // Was previously spawning 'cmd' directly with params '/D', '/S', '/C' - but we may as well let NodeJS do the work of escaping args to work correctly with cmd
-  return simpleSpawnSyncInternal(command, args, throwOnNonZero, true)
+  return simpleSpawnSyncInternal(command, args, throwOnNonZero, cwd, true)
 }
 
 /**
@@ -404,15 +420,20 @@ export function simpleCmdSync(command: string, args?: string[], throwOnNonZero: 
  * See {@link winInstallCert} and {@link winUninstallCert} for examples of taking user input and inserting it safely into known commands.
  * @param command Command to run
  * @param args Arguments to pass to the command
+ * @param options Optional {@link SimpleSpawnOptions} options
  * @returns An object with the status code, stdout, stderr, and error (if any)
  * @throws {@link SimpleSpawnError} if the command fails and throwOnNonZero is true
  */
-export async function simpleCmdAsync(command: string, args?: string[], throwOnNonZero: boolean = true): Promise<SimpleSpawnResult> {
+export async function simpleCmdAsync(command: string, args?: string[], options?: Partial<SimpleSpawnOptions>): Promise<SimpleSpawnResult> {
   if (!isPlatformWindows()) {
     throw new Error('getCmdResult is only supported on Windows')
   }
+
+  const throwOnNonZero = options?.throwOnNonZero !== undefined ? options?.throwOnNonZero : true
+  const cwd = options?.cwd ? options.cwd : process.cwd()
+
   // Was previously spawning 'cmd' directly with params '/D', '/S', '/C' - but we may as well let NodeJS do the work of escaping args to work correctly with cmd
-  return await simpleSpawnAsyncInternal(command, args, throwOnNonZero, true)
+  return await simpleSpawnAsyncInternal(command, args, throwOnNonZero, cwd, true)
 }
 
 /**
@@ -427,15 +448,18 @@ export async function simpleCmdAsync(command: string, args?: string[], throwOnNo
  * See {@link winInstallCert} and {@link winUninstallCert} for examples of taking user input and inserting it safely into known commands.
  * @param command Command to run
  * @param args Arguments to pass to the command
+ * @param options Optional {@link SimpleSpawnOptions} options
  * @returns An object with the status code, stdout, stderr, and error (if any)
  * @throws {@link SimpleSpawnError} if the command fails and throwOnNonZero is true
  */
-export function simpleSpawnSync(command: string, args?: string[], throwOnNonZero: boolean = true): SimpleSpawnResult {
-  return simpleSpawnSyncInternal(command, args, throwOnNonZero)
+export function simpleSpawnSync(command: string, args?: string[], options?: Partial<SimpleSpawnOptions>): SimpleSpawnResult {
+  const throwOnNonZero = options?.throwOnNonZero !== undefined ? options?.throwOnNonZero : true
+  const cwd = options?.cwd ? options.cwd : process.cwd()
+  return simpleSpawnSyncInternal(command, args, throwOnNonZero, cwd)
 }
 
 /**
- * Runs the requested command using {@link spawnAsync} and returns the result with stdout split into lines.
+ * Runs the requested command using {@link spawnAsync} and returns the result with stdout split into non-empty lines.
  * 
  * Use this for simple quick commands that don't require a lot of control.
  * 
@@ -446,11 +470,14 @@ export function simpleSpawnSync(command: string, args?: string[], throwOnNonZero
  * See {@link winInstallCert} and {@link winUninstallCert} for examples of taking user input and inserting it safely into known commands.
  * @param command Command to run
  * @param args Arguments to pass to the command
+ * @param options Optional {@link SimpleSpawnOptions} options
  * @returns An object with the status code, stdout, stderr, and error (if any)
  * @throws {@link SimpleSpawnError} if the command fails and throwOnNonZero is true
  */
-export async function simpleSpawnAsync(command: string, args?: string[], throwOnNonZero: boolean = true): Promise<SimpleSpawnResult> {
-  return await simpleSpawnAsyncInternal(command, args, throwOnNonZero)
+export async function simpleSpawnAsync(command: string, args?: string[], options?: Partial<SimpleSpawnOptions>): Promise<SimpleSpawnResult> {
+  const throwOnNonZero = options?.throwOnNonZero !== undefined ? options.throwOnNonZero : true
+  const cwd = options?.cwd ? options.cwd : process.cwd()
+  return await simpleSpawnAsyncInternal(command, args, throwOnNonZero, cwd)
 }
 
 /**

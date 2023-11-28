@@ -16,6 +16,7 @@
         "src/NodeCliUtilsConfig.ts",
         "src/parallel.ts",
         "src/TarballUtility.ts",
-        "src/NugetUtility.ts"
+        "src/NugetUtility.ts",
+        "src/DotnetSdkUtility.ts"
     ]
 }

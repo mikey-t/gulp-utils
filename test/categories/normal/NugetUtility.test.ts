@@ -3,8 +3,9 @@ import fsp from 'node:fs/promises'
 import path from 'node:path'
 import { describe, it, test } from 'node:test'
 import { INugetAccessor, NugetUtility } from '../../../src/NugetUtility.js'
+import { TargetFrameworkMoniker } from '../../../src/dotnetUtils.js'
 import { StringKeyedDictionary } from '../../../src/generalUtils.js'
-import { fixturesDir } from '../../../src/testUtils.js'
+import { assertErrorMessageEquals, fixturesDir, only } from '../../../src/testUtils.js'
 
 interface PackageInfo {
   packageName: string
@@ -13,10 +14,12 @@ interface PackageInfo {
   expectedVersionsMap: StringKeyedDictionary
 }
 
+const efPackageName = 'Microsoft.EntityFrameworkCore.Design'
+
 async function getPackageInfos(): Promise<PackageInfo[]> {
   return [
     await getPackageInfo(
-      'Microsoft.EntityFrameworkCore.Design',
+      efPackageName,
       [
         '8.0.0',
         '7.0.14',
@@ -92,7 +95,7 @@ describe('getLatestNugetPackageVersion', async () => {
           )
           const nugetUtil = new NugetUtility({ nugetAccessor: nugetAccessor })
 
-          const actualVersion = await nugetUtil.getLatestNugetPackageVersion(packageInfo.packageName, dotnetVersion)
+          const actualVersion = await nugetUtil.getLatestNugetPackageVersion(packageInfo.packageName, dotnetVersion as TargetFrameworkMoniker)
 
           assert.strictEqual(actualVersion, expectedVersion)
         })
@@ -101,7 +104,21 @@ describe('getLatestNugetPackageVersion', async () => {
   }
 })
 
-const mockError = `The mock was not setup correctly if you're seeing this`
+describe('getLatestMajorNugetPackageVersion', only, () => {
+  it(`returns the major version from the hard-coded list for ${efPackageName} and framework version 'net6.0'`, only, async () => {
+    const result = await new NugetUtility({ nugetAccessor: new MockNugetAccessor() }).getLatestMajorNugetPackageVersion(efPackageName, 'net6.0')
+    assert.strictEqual(result, 7)
+  })
+  it(`calls getLatestNugetPackageVersion if the combo isn't in the hard-coded list`, only, async () => {
+    const nugetUtility = new NugetUtility({ nugetAccessor: new MockNugetAccessor() })
+    await assert.rejects(
+      nugetUtility.getLatestMajorNugetPackageVersion(efPackageName, 'net11'),
+      err => assertErrorMessageEquals(err, mockError)
+    )
+  })
+})
+
+const mockError = `The mock was not setup correctly if you're seeing this (or it should not have been called)`
 
 // I'm using a separate implementation instead of just mocking the real NugetAccessor because the NodeJS test runner
 // dangerously reverts to the underlying implementation in many scenarios. Examples:
