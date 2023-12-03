@@ -1,6 +1,7 @@
 import 'dotenv/config'
 import fs from 'node:fs'
 import fsp from 'node:fs/promises'
+import os from 'node:os'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { parallel, series } from 'swig-cli'
@@ -185,6 +186,19 @@ export async function sonarHealth() {
 // Useful as an alternative to "npm link" for chaining multiple packages (which Volta doesn't seem to allow).
 export async function pack() {
   await spawnAsync('npm', ['pack'], { throwOnNonZero: true })
+}
+
+// Repro issue where first time dotnet message breaks parsing of command output in getDotnetToolInstalledVersion function
+export async function deleteDotnetFirstUseSentinel() {
+  const dotnetVersion = '8.0.100'
+  const firstTimeDotnetFile = path.join(os.homedir(), `.dotnet/${dotnetVersion}.dotnetFirstUseSentinel`)
+  log(`deleting file if it exists: ${firstTimeDotnetFile}`)
+  if (fs.existsSync(firstTimeDotnetFile)) {
+    await fsp.rm(firstTimeDotnetFile)
+    log(`deleted`)
+  } else {
+    log(`file does not exist - exiting`)
+  }
 }
 
 async function syncEnvFile() {

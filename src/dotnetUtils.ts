@@ -192,12 +192,24 @@ async function getDotnetToolInstalledVersion(toolName: string, globalInstall: bo
 
   const result = await simpleSpawnAsync('dotnet', ['tool', 'list', globalInstall ? '--global' : '--local'], { cwd: cwd })
 
-  const lines = result.stdoutLines
-
-  if (!lines[0].startsWith('Package Id') || !lines[1].startsWith('-')) {
-    throw new Error(`Unexpected output for command "dotnet tool list": ${JSON.stringify(lines)}`)
+  // The dotnet CLI can output an initial welcome message on first use - find the actual first line of output that we're looking for
+  let lines = result.stdoutLines
+  let columnHeaderLineIndex = -1
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].startsWith('Package Id')) {
+      columnHeaderLineIndex = i
+      break
+    }
   }
 
+  const errorMessagePrefix = 'Unexpected output for command "dotnet tool list" -'
+  if (columnHeaderLineIndex === -1) {
+    throw new Error(`${errorMessagePrefix} expected a line with the column header "Package Id": ${JSON.stringify(lines)}`)
+  }
+  lines = lines.slice(columnHeaderLineIndex)
+  if (!lines[1].startsWith('-')) {
+    throw new Error(`${errorMessagePrefix} expected a divider line: ${JSON.stringify(lines)}`)
+  }
   if (lines.length < 3) {
     return null
   }

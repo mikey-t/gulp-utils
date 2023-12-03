@@ -25,6 +25,7 @@
     "netextra",
     "netmf",
     "netstandard",
+    "NOLOGO",
     "Qube",
     "reportgenerator",
     "sonarqube",
