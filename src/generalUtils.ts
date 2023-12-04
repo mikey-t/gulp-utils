@@ -1335,8 +1335,8 @@ export function isChildPath(parentDir: string, child: string, requireChildExists
   const parentPath = path.normalize(path.resolve(parentDir))
   const childPath = path.normalize(path.resolve(child))
 
-  log(`parentPath: ${parentPath}`)
-  log(`childPath: ${childPath}`)
+  trace(`parentPath: ${parentPath}`)
+  trace(`childPath: ${childPath}`)
 
   return (
     childPath !== parentPath &&

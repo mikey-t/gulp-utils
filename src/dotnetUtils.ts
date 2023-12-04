@@ -440,3 +440,25 @@ export function sdkVersionToTfm(sdkVersion: number): TargetFrameworkMoniker {
   }
   return `net${sdkVersion}.0` as TargetFrameworkMoniker
 }
+
+// See https://learn.microsoft.com/en-us/dotnet/core/rid-catalog
+// Also called "RUNTIME_IDENTIFIER" or RID.
+const runtimeIdsImmutable = [
+  'win-x64',
+  'win-x86',
+  'win-arm64',
+  'linux-x64', // Most desktop distributions like CentOS, Debian, Fedora, Ubuntu, and derivatives
+  'linux-musl-x64', // Lightweight distributions using musl like Alpine Linux
+  'linux-musl-arm64', // Used to build Docker images for 64-bit Arm v8 and minimalistic base images
+  'linux-arm', // Linux distributions running on Arm like Raspbian on Raspberry Pi Model 2+
+  'linux-arm64', // Linux distributions running on 64-bit Arm like Ubuntu Server 64-bit on Raspberry Pi Model 3+
+  'linux-bionic-arm64', // Distributions using Android's bionic libc, for example, Termux
+  'osx-x64', // Minimum OS version is macOS 10.12 Sierra
+  'osx-arm64',
+  'ios-arm64',
+  'android-arm64'
+] as const
+
+export const runtimeIds: string[] = [...runtimeIdsImmutable]
+
+export type DotnetRuntimeIdentifier = typeof runtimeIdsImmutable[number]
