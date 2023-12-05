@@ -13,6 +13,11 @@ import { copyEnv, dictionaryToEnvFileString, getEnvAsDictionary, simpleSpawnAsyn
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { winInstallCert, winUninstallCert } from './certUtils.js'
 
+export type Func<T> = (...args: unknown[]) => T
+export type AsyncFunc<T> = (...args: unknown[]) => Promise<T>
+export type FuncOrAsyncFunc<T> = Func<T> | AsyncFunc<T>
+export type AsyncBooleanFunc = AsyncFunc<boolean>
+
 /**
  * Just a wrapper for console.log() to type less.
  * @param data The data to log
@@ -1223,10 +1228,6 @@ export function getRequiredCliParam(argvIndex: number, errorMessage?: string) {
   }
   return paramValue
 }
-
-type AsyncBooleanFunc = () => Promise<boolean>
-type AsyncFunc<T> = () => Promise<T>
-
 
 /**
  * Executes an asynchronous function conditionally.
