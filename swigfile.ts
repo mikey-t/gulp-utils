@@ -168,7 +168,9 @@ export const publishDocs = series(
 )
 
 export async function genDocs() {
-  log(`${Emoji.Warning} This does not publish the docs. If you want to both build and publish docs with one command, run this instead: swig publishDocs`)
+  if (process.argv[2] === 'genDocs') {
+    log(`${Emoji.Warning} This does not publish the docs. If you want to both build and publish docs with one command, run this instead: swig publishDocs`)
+  }
   await spawnAsync('node', [typedocPath], { throwOnNonZero: true })
 }
 
