@@ -19,9 +19,9 @@ export async function copyEnv(sourcePath: string, destinationPath: string, overr
   const destDir = path.dirname(destinationPath)
   if (!fs.existsSync(destDir)) {
     if (throwIfDestinationDirectoryMissing) {
-      throw new Error(`Cannot copy env - directory does not exist: ${destDir}`)
+      throw new Error(`Destination directory does not exist: ${destDir}`)
     } else {
-      log(`skipping copy for missing destination directory: ${destDir}`)
+      log(`skipping env file copy operation - destination directory does not exist: ${destinationPath}`)
     }
     return
   }
