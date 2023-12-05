@@ -579,8 +579,19 @@ export async function getConfirmationExample() {
   }
 }
 
+export interface CopyEnvOptions {
+  /**  Defaults to `false`. If `true`, messages about adding missing keys will not be logged (useful if you're always calling {@link copyModifiedEnv} after this call). */
+  suppressAddKeysMessages: boolean
+  /** Defaults to `false`. If `true`, an error will be thrown if the destinationPath does not exist. If `false`, a message will be logged and no error will be thrown. */
+  throwIfDestinationDirectoryMissing: boolean
+}
+
 /**
  * Copy entries from a source .env file to a destination .env file for which the destination .env file does not already have entries.
+ * 
+ * If the destination directory does not exist, a message will be logged and no other action will be taken. Alternatively, to throw an exception
+ * when the destination directory does not exist, set the {@link CopyEnvOptions.throwIfDestinationDirectoryMissing} option to `true`.
+ * 
  * If the destination .env file does not exist, it will be created and populated with the source .env file's values.
  * 
  * This is useful for copying values from a .env.template file to a root .env file.
@@ -588,13 +599,18 @@ export async function getConfirmationExample() {
  * For copying root .env files to other locations, use {@link overwriteEnvFile}.
  * @param sourcePath The path to the source .env file such as a `.env.template` file (use {@link overwriteEnvFile} for copying root .env files to other locations)
  * @param destinationPath The path to the destination .env file, such as the root .env file
+ * @param options Optional {@link CopyEnvOptions} options.
  */
-export async function copyNewEnvValues(sourcePath: string, destinationPath: string) {
-  await copyEnv(sourcePath, destinationPath, false)
+export async function copyNewEnvValues(sourcePath: string, destinationPath: string, options?: Partial<CopyEnvOptions>) {
+  await copyEnv(sourcePath, destinationPath, false, options?.suppressAddKeysMessages, options?.throwIfDestinationDirectoryMissing)
 }
 
 /**
  * Copy entries from a source .env file to a destination .env file, overwriting any existing entries in the destination .env file.
+ * 
+ * If the destination directory does not exist, a message will be logged and no other action will be taken. Alternatively, to throw an exception
+ * when the destination directory does not exist, set the {@link CopyEnvOptions.throwIfDestinationDirectoryMissing} option to `true`.
+ * 
  * If the destination .env file does not exist, it will be created and populated with the source .env file's values.
  * 
  * This is useful for copying values from a root .env file to additional locations (server, client, docker-compose directory, etc.)
@@ -606,10 +622,10 @@ export async function copyNewEnvValues(sourcePath: string, destinationPath: stri
  * For copying .env.template files to root .env files, use {@link copyNewEnvValues}.
  * @param sourcePath The path to the source .env file such as a root .env file (use {@link copyNewEnvValues} for .env.template files)
  * @param destinationPath The path to the destination .env file
- * @param suppressAddKeysMessages If true, messages about adding missing keys will not be logged (useful if you're always calling {@link copyModifiedEnv} after this call)
+ * @param options Optional {@link CopyEnvOptions} options.
  */
-export async function overwriteEnvFile(sourcePath: string, destinationPath: string, suppressAddKeysMessages = false) {
-  await copyEnv(sourcePath, destinationPath, true, suppressAddKeysMessages)
+export async function overwriteEnvFile(sourcePath: string, destinationPath: string, options?: Partial<CopyEnvOptions>) {
+  await copyEnv(sourcePath, destinationPath, true, options?.suppressAddKeysMessages, options?.throwIfDestinationDirectoryMissing)
 }
 
 /**

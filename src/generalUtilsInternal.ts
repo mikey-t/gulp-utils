@@ -12,10 +12,21 @@ const isEsm = !isCommonJS
 const spawnWorkaroundScriptName = 'runWhileParentAlive.js'
 const currentModuleDir: string = '' // Lazy loaded in getCurrentModuleDir
 
-export async function copyEnv(sourcePath: string, destinationPath: string, overrideExistingDestinationValues = true, suppressAddKeysMessages = false) {
+export async function copyEnv(sourcePath: string, destinationPath: string, overrideExistingDestinationValues = true, suppressAddKeysMessages = false, throwIfDestinationDirectoryMissing = false) {
   requireValidPath('sourcePath', sourcePath)
+  requireString('destinationPath', destinationPath)
 
-  // If the destination .env file doesn't exist, just copy it and return
+  const destDir = path.dirname(destinationPath)
+  if (!fs.existsSync(destDir)) {
+    if (throwIfDestinationDirectoryMissing) {
+      throw new Error(`Cannot copy env - directory does not exist: ${destDir}`)
+    } else {
+      log(`skipping copy for missing destination directory: ${destDir}`)
+    }
+    return
+  }
+
+  // If the destination .env file doesn't exist, just copy it over
   if (!fs.existsSync(destinationPath)) {
     log(`creating ${destinationPath} from ${sourcePath}`)
     await fsp.copyFile(sourcePath, destinationPath)
