@@ -1185,6 +1185,31 @@ export function toWslPath(winPath: string, wrapInQuotesIfSpaces: boolean = true)
 }
 
 /**
+ * Spawns a process that runs `wsl test -e <wslPath>` to determine if a wsl path exists.
+ * @param wslPath WSL path to check
+ * @returns `true` if the wsl path exists, `false` otherwise
+ * @throws Error if executed on non-windows platform
+ * @throws Error if wsl is not installed
+ */
+export function wslPathExists(wslPath: string): boolean {
+  if (!isPlatformWindows()) {
+    throw new Error('Cannot check for the existence of a WSL path on a non-windows platform')
+  }
+
+  if (!whichSync('wsl').location) {
+    throw new Error('Cannot check wsl path - wsl is not installed')
+  }
+
+  if (!wslPath || typeof wslPath !== 'string' || wslPath.length === 0 || wslPath.trim().length === 0) {
+    return false
+  }
+
+  const pathWithoutDoubleQuotes = wslPath.replaceAll('"', '')
+
+  return simpleSpawnSync('wsl', ['test', '-e', pathWithoutDoubleQuotes], { throwOnNonZero: false }).code === 0
+}
+
+/**
  * Serialize a class instance. Ignore properties with underscore prefix and include getters. Useful for overriding the `toJSON` function of
  * a class so that calls to `JSON.stringify()` will generate more appropriate JSON.
  * 
@@ -1387,3 +1412,5 @@ export function findAllIndexes(input: string, substring: string): number[] {
 
   return indexes
 }
+
+

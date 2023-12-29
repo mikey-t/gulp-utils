@@ -2,7 +2,7 @@ import assert from 'node:assert'
 import path from 'node:path'
 import { describe, it } from 'node:test'
 import { config } from '../../../src/NodeCliUtilsConfig.js'
-import { conditionallyAsync, getRandomIntInclusive, humanizeTime, isChildPath, requireString, spawnAsync, toWslPath, which, whichSync } from '../../../src/generalUtils.js'
+import { conditionallyAsync, getRandomIntInclusive, humanizeTime, isChildPath, requireString, spawnAsync, toWslPath, which, whichSync, wslPathExists } from '../../../src/generalUtils.js'
 import { assertErrorMessageEquals, assertErrorMessageStartsWith, fixturesDir } from '../../../src/testUtils.js'
 
 config.traceEnabled = false
@@ -306,5 +306,38 @@ describe('isChildPath', () => {
       () => isChildPath('./test/fixtures/isChildPathTest/parent/placeholder.txt', './test/fixtures/isChildPathTest/parent/placeholder.txt/child'),
       err => assertErrorMessageEquals(err, 'The parentDir param must be an existing directory')
     )
+  })
+})
+
+describe('wslPathExists', () => {
+  it('returns false for empty paths', () => {
+    let result = wslPathExists('')
+    assert.strictEqual(result, false)
+    result = wslPathExists(null!)
+    assert.strictEqual(result, false)
+    result = wslPathExists(' ')
+    assert.strictEqual(result, false)
+  })
+  it('returns false for non-existent path', () => {
+    const result = wslPathExists('/mnt/f/nowhere')
+    assert.strictEqual(result, false)
+  })
+  it('returns true for directory that exists', () => {
+    const result = wslPathExists('/mnt/c/Users/')
+    assert.strictEqual(result, true)
+  })
+  it('returns true for paths that exist with valid double quotes', () => {
+    let result = wslPathExists('/mnt/c/"Program Files"/')
+    assert.strictEqual(result, true)
+    result = wslPathExists('"/mnt/c/Program Files/"')
+    assert.strictEqual(result, true)
+  })
+  it('returns true for paths that exist with spaces', () => {
+    const result = wslPathExists('/mnt/c/Program Files/')
+    assert.strictEqual(result, true)
+  })
+  it('returns true for file that exists', () => {
+    const result = wslPathExists('/mnt/c/Windows/System32/drivers/etc/hosts')
+    assert.strictEqual(result, true)
   })
 })

@@ -5,7 +5,7 @@ import { describe, it, test } from 'node:test'
 import { INugetAccessor, NugetUtility } from '../../../src/NugetUtility.js'
 import { TargetFrameworkMoniker } from '../../../src/dotnetUtils.js'
 import { StringKeyedDictionary } from '../../../src/generalUtils.js'
-import { assertErrorMessageEquals, fixturesDir, only } from '../../../src/testUtils.js'
+import { assertErrorMessageEquals, fixturesDir } from '../../../src/testUtils.js'
 
 interface PackageInfo {
   packageName: string
@@ -104,12 +104,12 @@ describe('getLatestNugetPackageVersion', async () => {
   }
 })
 
-describe('getLatestMajorNugetPackageVersion', only, () => {
-  it(`returns the major version from the hard-coded list for ${efPackageName} and framework version 'net6.0'`, only, async () => {
+describe('getLatestMajorNugetPackageVersion', () => {
+  it(`returns the major version from the hard-coded list for ${efPackageName} and framework version 'net6.0'`, async () => {
     const result = await new NugetUtility({ nugetAccessor: new MockNugetAccessor() }).getLatestMajorNugetPackageVersion(efPackageName, 'net6.0')
     assert.strictEqual(result, 7)
   })
-  it(`calls getLatestNugetPackageVersion if the combo isn't in the hard-coded list`, only, async () => {
+  it(`calls getLatestNugetPackageVersion if the combo isn't in the hard-coded list`, async () => {
     const nugetUtility = new NugetUtility({ nugetAccessor: new MockNugetAccessor() })
     await assert.rejects(
       nugetUtility.getLatestMajorNugetPackageVersion(efPackageName, 'net11'),

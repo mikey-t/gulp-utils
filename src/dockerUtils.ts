@@ -2,7 +2,7 @@ import { execSync } from 'child_process'
 import fs from 'node:fs'
 import path from 'path'
 import { config } from './NodeCliUtilsConfig.js'
-import { ExtendedError, SimpleSpawnResult, getNormalizedError, getPowershellHackArgs, isPlatformLinux, isPlatformWindows, log, requireString, requireValidPath, simpleSpawnAsync, spawnAsync, toWslPath, trace, which, withRetryAsync } from './generalUtils.js'
+import { Emoji, ExtendedError, SimpleSpawnResult, getNormalizedError, getPowershellHackArgs, isPlatformLinux, isPlatformWindows, log, requireString, requireValidPath, simpleSpawnAsync, spawnAsync, toWslPath, trace, which, withRetryAsync, wslPathExists } from './generalUtils.js'
 import { SpawnOptionsInternal, spawnAsyncInternal, throwIfDockerNotReady } from './generalUtilsInternal.js'
 
 /**
@@ -147,7 +147,7 @@ export async function spawnDockerCompose(dockerComposePath: string, dockerCompos
   if (!options || options.useWslPrefix === undefined) {
     mergedOptions.useWslPrefix = config.useWslPrefixForDockerCommandsOnWindows
   }
-  
+
   const dockerComposeDir = path.dirname(dockerComposePath)
   const dockerComposeFilename = path.basename(dockerComposePath)
 
@@ -158,6 +158,13 @@ export async function spawnDockerCompose(dockerComposePath: string, dockerCompos
   let dockerComposePathResolved = mergedOptions.cwd ? path.resolve(dockerComposePath) : dockerComposeFilename
   if (mergedOptions.useWslPrefix) {
     dockerComposePathResolved = toWslPath(dockerComposePathResolved)
+    if (!wslPathExists(dockerComposePathResolved)) {
+      log(`${Emoji.Warning} Warning: spawnDockerCompose is using the wsl command prefix but the wsl path to the docker compose isn't accessible: ${dockerComposePathResolved}`)
+      log(`Sometimes wsl "crashes" so that parts of it's filesystem disappear. If the windows version of the path definitely exists, try one of these options:`)
+      log(`- Restart wsl (first run "wsl --shutdown", wait a few seconds, and then "wsl")`)
+      log(`- Pass the 'useWslPrefix' option as 'false' to spawnDockerCompose`)
+      log(`- Import 'config' from node-cli-utils and set 'useWslPrefixForDockerCommandsOnWindows' to false`)
+    }
   }
 
   let spawnArgs = ['compose', '-f', dockerComposePathResolved]
