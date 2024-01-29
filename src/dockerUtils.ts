@@ -391,3 +391,24 @@ export async function deleteDockerVolume(volumeName: string): Promise<void> {
   trace(`deleting docker compose volume ${volumeName}`)
   await simpleSpawnDockerAsync(['volume', 'rm', volumeName])
 }
+
+/**
+ * Helper method to attach to a running docker container and open a shell.
+ * 
+ * Requirements:
+ * - Docker must be running
+ * - The container must be running
+ * - The docker compose file provided must exist and be valid
+ * - The `containerName` passed must match what is in the docker compose file
+ * - The running container must have `bash` installed and available to login to
+ * @param dockerComposePath Path to the docker compose file to use (i.e. `docker-compose.yml`)
+ * @param containerName The name of the container to attach to and start a shell
+ */
+export async function dockerComposeBash(dockerComposePath: string, containerName: string) {
+  requireValidPath('dockerComposePath', dockerComposePath)
+  requireString('containerName', containerName)
+  if (containerName.indexOf(' ') !== -1 || containerName.indexOf(`'`) !== -1) {
+    throw new Error(`Invalid containerName: ${containerName}`)
+  }
+  await spawnDockerCompose(dockerComposePath, 'exec', { args: ['-it', containerName, 'bash'], attached: true })
+}
