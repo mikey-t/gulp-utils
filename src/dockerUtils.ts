@@ -200,14 +200,16 @@ export async function spawnDockerCompose(dockerComposePath: string, dockerCompos
   const spawnOptions: Partial<SpawnOptionsInternal> = {
     cwd: mergedOptions.cwd,
     shell: isPlatformWindows(), // Early termination with ctrl + C on windows will not be graceful unless the shell option is set to true
-    isLongRunning: longRunning
+    isLongRunning: longRunning,
+    throwOnNonZero: false
   }
 
   const spawnResult = mergedOptions.useWslPrefix ?
     await spawnAsyncInternal('wsl', ['docker', ...spawnArgs], spawnOptions) :
     await spawnAsyncInternal('docker', spawnArgs, spawnOptions)
 
-  if (spawnResult.code !== 0) {
+  // Code 130 is the code for ctrl-c, which we don't want to consider an error
+  if (spawnResult.code !== 0 && spawnResult.code !== 130) {
     throw new Error(`docker compose command failed with code ${spawnResult.code}`)
   }
 }
