@@ -82,7 +82,7 @@ export interface SpawnResult {
 }
 
 /**
- * Error throw by {@link spawnAsync} when the spawned process exits with a non-zero exit code and options.throwOnNonZero is true.
+ * Error thrown by {@link spawnAsync} when the spawned process exits with a non-zero exit code and options.throwOnNonZero is true.
  * 
  * Contains a {@link SpawnResult} with the exit code, stdout, stderr, and error (if any).
  */
@@ -105,7 +105,7 @@ export interface SimpleSpawnResult extends SpawnResult {
 }
 
 /**
- * Error throw by {@link simpleSpawnSync} and {@link simpleCmdSync} when the spawned process exits with a non-zero exit code and throwOnNonZero param is true (the default).
+ * Error thrown by {@link simpleSpawnSync} and {@link simpleCmdSync} when the spawned process exits with a non-zero exit code and throwOnNonZero param is true.
  * 
  * Contains a {@link SimpleSpawnResult} with the exit code, stdout, stderr, and error (if any) in addition to stdoutLines, which is stdout split into lines from stdout that weren't empty.
  */
@@ -151,7 +151,7 @@ export interface SpawnOptionsWithThrow extends SpawnOptions {
  * Options interface for methods {@link simpleSpawnSync}, {@link simpleSpawnAsync}, {@link simpleCmdSync} and {@link simpleCmdAsync}.
  */
 export interface SimpleSpawnOptions {
-  /** Defaults to `true`. Note that this is the opposite of the default for {@link spawnAsync}. */
+  /** Defaults to `true`. */
   throwOnNonZero: boolean
   /** Optional current working directory. Defaults to `process.cwd()`. */
   cwd: string
@@ -399,7 +399,7 @@ export function stringToLines(str: string): string[] {
  * @param args Arguments to pass to the command
  * @param options Optional {@link SimpleSpawnOptions} options
  * @returns An object with the status code, stdout, stderr, and error (if any)
- * @throws {@link SimpleSpawnError} if the command fails and throwOnNonZero is true
+ * @throws {@link SimpleSpawnError} if the command fails and throwOnNonZero option is `true`
  */
 export function simpleCmdSync(command: string, args?: string[], options?: Partial<SimpleSpawnOptions>): SimpleSpawnResult {
   if (!isPlatformWindows()) {
@@ -427,7 +427,7 @@ export function simpleCmdSync(command: string, args?: string[], options?: Partia
  * @param args Arguments to pass to the command
  * @param options Optional {@link SimpleSpawnOptions} options
  * @returns An object with the status code, stdout, stderr, and error (if any)
- * @throws {@link SimpleSpawnError} if the command fails and throwOnNonZero is true
+ * @throws {@link SimpleSpawnError} if the command fails and throwOnNonZero option is `true`
  */
 export async function simpleCmdAsync(command: string, args?: string[], options?: Partial<SimpleSpawnOptions>): Promise<SimpleSpawnResult> {
   if (!isPlatformWindows()) {
@@ -455,7 +455,7 @@ export async function simpleCmdAsync(command: string, args?: string[], options?:
  * @param args Arguments to pass to the command
  * @param options Optional {@link SimpleSpawnOptions} options
  * @returns An object with the status code, stdout, stderr, and error (if any)
- * @throws {@link SimpleSpawnError} if the command fails and throwOnNonZero is true
+ * @throws {@link SimpleSpawnError} if the command fails and throwOnNonZero option is `true`
  */
 export function simpleSpawnSync(command: string, args?: string[], options?: Partial<SimpleSpawnOptions>): SimpleSpawnResult {
   const throwOnNonZero = options?.throwOnNonZero !== undefined ? options?.throwOnNonZero : true
@@ -477,7 +477,7 @@ export function simpleSpawnSync(command: string, args?: string[], options?: Part
  * @param args Arguments to pass to the command
  * @param options Optional {@link SimpleSpawnOptions} options
  * @returns An object with the status code, stdout, stderr, and error (if any)
- * @throws {@link SimpleSpawnError} if the command fails and throwOnNonZero is true
+ * @throws {@link SimpleSpawnError} if the command fails and throwOnNonZero option is `true`
  */
 export async function simpleSpawnAsync(command: string, args?: string[], options?: Partial<SimpleSpawnOptions>): Promise<SimpleSpawnResult> {
   const throwOnNonZero = options?.throwOnNonZero !== undefined ? options.throwOnNonZero : true

@@ -152,7 +152,7 @@ const setDefaultsAndMergeOptions = (options?: Partial<SpawnOptionsInternal>): Sp
     throw new Error(`The cwd path provided does not exist: ${options.cwd}`)
   }
 
-  const defaultSpawnOptions: SpawnOptionsInternal = { stdio: 'inherit', isLongRunning: false, throwOnNonZero: false }
+  const defaultSpawnOptions: SpawnOptionsInternal = { stdio: 'inherit', isLongRunning: false, throwOnNonZero: true }
   return { ...defaultSpawnOptions, ...options }
 }
 
