@@ -4,6 +4,7 @@ import { describe, it } from 'node:test'
 import { config } from '../../../src/NodeCliUtilsConfig.js'
 import { conditionallyAsync, getRandomIntInclusive, humanizeTime, isChildPath, requireString, spawnAsync, toWslPath, which, whichSync, wslPathExists } from '../../../src/generalUtils.js'
 import { assertErrorMessageEquals, assertErrorMessageStartsWith, fixturesDir } from '../../../src/testUtils.js'
+import { splitByWhitespace } from '../../../src/generalUtils.js'
 
 config.traceEnabled = false
 
@@ -344,5 +345,35 @@ describe('wslPathExists', () => {
   it('returns true for file that exists', () => {
     const result = wslPathExists('/mnt/c/Windows/System32/drivers/etc/hosts')
     assert.strictEqual(result, true)
+  })
+})
+
+describe('splitByWhitespace', () => {
+  it('should split a string into an array of consecutive non-whitespace chars', () => {
+    const input = 'Hello world! This is a test.'
+    const expected = ['Hello', 'world!', 'This', 'is', 'a', 'test.']
+    const result = splitByWhitespace(input)
+    assert.deepStrictEqual(result, expected)
+  })
+  it('should handle leading and trailing whitespace', () => {
+    const input = '   leading and trailing   '
+    const expected = ['leading', 'and', 'trailing']
+    const result = splitByWhitespace(input)
+    assert.deepStrictEqual(result, expected)
+  })
+  it('should handle multiple consecutive whitespace chars', () => {
+    const input = 'Multiple   consecutive    whitespace   chars'
+    const expected = ['Multiple', 'consecutive', 'whitespace', 'chars']
+    const result = splitByWhitespace(input)
+    assert.deepStrictEqual(result, expected)
+  })
+  it('should handle an empty string', () => {
+    const result = splitByWhitespace('')
+    assert.deepStrictEqual(result, [])
+  })
+  it('should return an array with one item if there is no whitespace', () => {
+    const result = splitByWhitespace('test')
+    const expected = ['test']
+    assert.deepStrictEqual(result, expected)
   })
 })

@@ -1413,4 +1413,13 @@ export function findAllIndexes(input: string, substring: string): number[] {
   return indexes
 }
 
-
+/**
+ * @param input A string to split.
+ * @returns An array of each of the input string's sets of consecutive non-whitespace characters.
+ */
+export function splitByWhitespace(input: string): string[] {
+  if (!input) {
+    return []
+  }
+  return input.match(/\S+/g) || []
+}

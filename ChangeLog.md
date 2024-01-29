@@ -7,3 +7,7 @@
 ## 2.0.28
 
 - Updated `spawnAsync` so `throwOnNonZero` defaults to `true`
+
+## 2.0.29
+
+- Added the util method `splitByWhitespace`
