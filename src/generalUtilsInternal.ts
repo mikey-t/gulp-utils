@@ -322,16 +322,30 @@ export async function simpleSpawnAsyncInternal(command: string, args?: string[],
 type SimpleSpawnFunction = (cmd: string, args: string[]) => Promise<SimpleSpawnResult> | SimpleSpawnResult
 
 // Spawn functions passed here so they can be mocked in tests
-export function whichInternal(commandName: string, simpleCmd: SimpleSpawnFunction, simpleSpawn: SimpleSpawnFunction): Promise<WhichResult> | WhichResult {
+export function whichInternal(commandName: string, simpleCmd: SimpleSpawnFunction, simpleSpawn: SimpleSpawnFunction, wslPrefix?: boolean): Promise<WhichResult> | WhichResult {
   requireString('commandName', commandName)
 
   if (stripShellMetaCharacters(commandName) !== commandName) {
     throw new Error(`commandName cannot contain shell meta characters: ${commandName}`)
   }
 
-  const execFunc = isPlatformWindows() ? simpleCmd : simpleSpawn
-  const cmd = isPlatformWindows() ? 'where' : 'which'
-  const args = isPlatformWindows() ? [commandName] : ['-a', commandName]
+  const isWindows = isPlatformWindows()
+
+  if (!isWindows && wslPrefix) {
+    throw new Error('Cannot pass the wslPrefix option on non-windows platform')
+  }
+
+  const execFunc = isWindows ? simpleCmd : simpleSpawn
+
+  let cmd = 'which'
+  if (isWindows) {
+    cmd = wslPrefix ? 'wsl' : 'where'
+  }
+  
+  let args = ['-a', commandName]
+  if (isWindows) {
+    args = wslPrefix ? ['which', commandName] : [commandName]
+  }
 
   try {
     const result = execFunc(cmd, args)

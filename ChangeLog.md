@@ -11,3 +11,7 @@
 ## 2.0.29
 
 - Added the util method `splitByWhitespace`
+
+## 2.0.30
+
+- Added `whichWsl` method

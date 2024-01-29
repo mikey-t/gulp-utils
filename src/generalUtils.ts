@@ -519,6 +519,17 @@ export async function which(commandName: string): Promise<WhichResult> {
 }
 
 /**
+ * Get the location of a system command within WSL. Call from non-WSL context like Powershell or CMD to see if a command
+ * exists within your default wsl installation. See also: {@link which}.
+ * @param commandName The name of the command to find within WSL installation
+ * @returns The first location of the command, any additional locations, and an error if one occurred
+ * @throws If run from non-windows platform or wsl is not installed/accessible/configured
+ */
+export async function whichWsl(commandName: string): Promise<WhichResult> {
+  return whichInternal(commandName, simpleCmdAsync, simpleSpawnAsync, true)
+}
+
+/**
  * This is a cross-platform method to get the location of a system command. Useful for checking if software
  * is installed, where it's installed and whether there are multiple locations.
  * @param commandName The name of the command to find
