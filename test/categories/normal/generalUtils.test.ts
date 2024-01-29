@@ -186,8 +186,13 @@ describe('spawnAsync', () => {
     const result = await spawnAsync('node', [path.join(fixturesDir, 'nodeScript.js')])
     assert.strictEqual(result.code, 0)
   })
-  it('result has non-zero code attempting to spawn node against nonexistent script', async () => {
-    const result = await spawnAsync('node', [path.join(fixturesDir, 'thisScriptDoesNotExist.js')], { stdio: 'pipe' })
+  it('throws attempting to spawn node against nonexistent script', async () => {
+    await assert.rejects(async () => {
+      await spawnAsync('node', [path.join(fixturesDir, 'thisScriptDoesNotExist.js')], { stdio: 'pipe' })
+    })
+  })
+  it('returns non-zero exit code when spawning a nonexistent script with throwOnNonZero set to false', async () => {
+    const result = await spawnAsync('node', [path.join(fixturesDir, 'thisScriptDoesNotExist.js')], { stdio: 'pipe', throwOnNonZero: false })
     assert.strictEqual(result.code, 1)
   })
 })
