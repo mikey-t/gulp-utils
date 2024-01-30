@@ -151,8 +151,10 @@ const setDefaultsAndMergeOptions = (options?: Partial<SpawnOptionsInternal>): Sp
   if (options?.cwd && !fs.existsSync(options.cwd)) {
     throw new Error(`The cwd path provided does not exist: ${options.cwd}`)
   }
-
   const defaultSpawnOptions: SpawnOptionsInternal = { stdio: 'inherit', isLongRunning: false, throwOnNonZero: true }
+  if (options?.isLongRunning) {
+    defaultSpawnOptions.throwOnNonZero = false
+  }
   return { ...defaultSpawnOptions, ...options }
 }
 
@@ -341,7 +343,7 @@ export function whichInternal(commandName: string, simpleCmd: SimpleSpawnFunctio
   if (isWindows) {
     cmd = wslPrefix ? 'wsl' : 'where'
   }
-  
+
   let args = ['-a', commandName]
   if (isWindows) {
     args = wslPrefix ? ['which', commandName] : [commandName]
