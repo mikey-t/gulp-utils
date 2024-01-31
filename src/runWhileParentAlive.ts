@@ -85,6 +85,11 @@ try {
     pollingMillis = config.orphanProtectionPollingIntervalMillis
   }
   const passthroughArgs = process.argv.slice(5)
+  const command = passthroughArgs[0]
+  let deserializedArgs: string[] = []
+  if (passthroughArgs.length > 1) {
+    deserializedArgs = (JSON.parse(Buffer.from(passthroughArgs[1], 'base64').toString('utf8')) as string[]).map(x => x.indexOf(' ') !== -1 && !x.startsWith('"') && !x.endsWith('"') ? `"${x}"` : x)
+  }
 
   if (loggingEnabled) {
     traceAndLog(`Logging enabled with polling rate set to: ${pollingMillis}ms`)
@@ -98,7 +103,8 @@ try {
     traceAndLog(`process.argv[2] (logging enabled): ${process.argv[2]}`, true)
     traceAndLog(`process.argv[3]   (trace enabled): ${process.argv[3]}`, true)
     traceAndLog(`process.argv[4]  (polling millis): ${process.argv[4]}`, true)
-    traceAndLog(`rest of process.argv: ${JSON.stringify(passthroughArgs)}`, true)
+    traceAndLog(`passed through command: ${command}`)
+    traceAndLog(`passed through deserialized args: ${deserializedArgs}`)
   }
 
   const parentId = process.ppid
@@ -109,9 +115,7 @@ try {
     process.exit(1)
   }
 
-  const [command, ...args] = passthroughArgs
-
-  const child = spawn(command, args, { stdio: 'inherit', shell: 'cmd.exe' })
+  const child = spawn(command, deserializedArgs, { stdio: 'inherit', shell: 'cmd.exe' })
 
   const childId = child.pid
   if (!childId) {

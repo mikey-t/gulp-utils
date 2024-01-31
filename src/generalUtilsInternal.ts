@@ -193,13 +193,15 @@ async function spawnWithKeepaliveWorkaround(logPrefix: string, workaroundScriptP
     trace(`${logPrefix}Orphan protection logging path: ${config.orphanProtectionLoggingPath}`)
   }
 
+  const argsSerialized = args.length > 0 ? [Buffer.from(JSON.stringify(args)).toString('base64')] : []
+
   const workaroundArgs = [
     workaroundScriptPath,
     loggingEnabledString,
     traceEnabledString,
     pollingMillisString,
     command,
-    ...(args ?? [])
+    ...(argsSerialized)
   ]
 
   return await spawnAsync('node', workaroundArgs, { ...options, stdio: 'inherit', shell: true })
