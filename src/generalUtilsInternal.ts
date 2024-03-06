@@ -305,7 +305,7 @@ export async function simpleSpawnAsyncInternal(command: string, args?: string[],
   requireString('command', command)
   requireValidPath('cwd', cwd)
 
-  const result = await spawnAsync(command, args, { stdio: 'pipe', shell: useCmd ? 'cmd.exe' : false, cwd: cwd })
+  const result = await spawnAsync(command, args, { stdio: 'pipe', shell: useCmd ? 'cmd.exe' : false, cwd: cwd, throwOnNonZero: false })
 
   const spawnResult: SimpleSpawnResult = {
     code: result.code,

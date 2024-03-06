@@ -35,3 +35,7 @@ await spawnAsyncLongRunning(
   ]
 )
 ```
+
+## 2.0.34
+
+- Fixed bug where `simpleSpawnAsync` was not respecting the `throwOnNonZero` option when it is set to false.

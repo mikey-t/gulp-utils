@@ -7,13 +7,13 @@ describe('getInstalledSdkVersions', () => {
     const versions = await new DotnetSdkUtility().getInstalledSdkVersions()
     assert.strictEqual(versions.length > 0, true, 'should have at least one version of dotnet installed')
 
-    const version6String = '6.0.418'
+    const version6String = '6.0.419'
     const version6 = versions.find(v => v.full === version6String)
 
     assert.ok(version6, `expected to have dotnet version ${version6String} installed`)
     assert.strictEqual(version6.major, 6)
     assert.strictEqual(version6.minor, 0)
-    assert.strictEqual(version6.patch, 418)
+    assert.strictEqual(version6.patch, 419)
 
     const version8String = '8.0.100'
     const version8 = versions.find(v => v.full === version8String)
