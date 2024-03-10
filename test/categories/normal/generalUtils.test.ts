@@ -1,9 +1,11 @@
 import assert from 'node:assert'
+import fs from 'node:fs'
+import fsp from 'node:fs/promises'
 import path from 'node:path'
 import { describe, it } from 'node:test'
 import { config } from '../../../src/NodeCliUtilsConfig.js'
-import { conditionallyAsync, getRandomIntInclusive, humanizeTime, isChildPath, requireString, simpleSpawnAsync, spawnAsync, splitByWhitespace, toWslPath, which, whichSync, wslPathExists } from '../../../src/generalUtils.js'
-import { assertErrorMessageEquals, assertErrorMessageIncludes, assertErrorMessageStartsWith, fixturesDir } from '../../../src/testUtils.js'
+import { conditionallyAsync, copyDirectoryContents, emptyDirectory, getRandomIntInclusive, humanizeTime, isChildPath, requireString, simpleSpawnAsync, spawnAsync, splitByWhitespace, toWslPath, which, whichSync, wslPathExists } from '../../../src/generalUtils.js'
+import { assertErrorMessageEquals, assertErrorMessageIncludes, assertErrorMessageStartsWith, fixturesDir, tempDir } from '../../../src/testUtils.js'
 
 config.traceEnabled = false
 
@@ -449,3 +451,56 @@ describe('splitByWhitespace', () => {
     assert.deepStrictEqual(result, expected)
   })
 })
+
+describe('copyDirectoryContents', () => {
+  it('copies all files and directories if no exclusions passed', async () => {
+    const copyDirName = 'copyDirectoryContents'
+    const dirToCopy = path.join(fixturesDir, copyDirName)
+    const destination = path.join(tempDir, copyDirName)
+    await emptyDirectory(destination)
+    const thisFileCopied = 'thisFileCopied.txt'
+    const thisFileCopiedSubDir = `thisDirCopied/${thisFileCopied}`
+    const thisFileIgnored = 'thisFileIgnored.txt'
+    const thisFileIgnoredSubDir = 'thisDirIgnored/thisFileIgnored.txt'
+
+    await copyDirectoryContents(dirToCopy, destination)
+
+    await assertFileMatch(path.join(dirToCopy, thisFileCopied), path.join(tempDir, copyDirName, thisFileCopied))
+    await assertFileMatch(path.join(dirToCopy, thisFileCopiedSubDir), path.join(tempDir, copyDirName, thisFileCopiedSubDir))
+    await assertFileMatch(path.join(dirToCopy, thisFileIgnored), path.join(tempDir, copyDirName, thisFileCopied))
+    await assertFileMatch(path.join(dirToCopy, thisFileIgnoredSubDir), path.join(tempDir, copyDirName, thisFileIgnoredSubDir))
+  })
+
+  it('copies all files and directories except exclusions passed', async () => {
+    const copyDirName = 'copyDirectoryContents'
+    const dirToCopy = path.join(fixturesDir, copyDirName)
+    const destination = path.join(tempDir, copyDirName)
+    await emptyDirectory(destination)
+    const thisFileCopied = 'thisFileCopied.txt'
+    const thisDirIgnored = 'thisDirIgnored'
+    const thisFileCopiedSubDir = `thisDirCopied/${thisFileCopied}`
+    const thisFileIgnored = 'thisFileIgnored.txt'
+
+    await copyDirectoryContents(dirToCopy, destination, { exclusions: [thisFileIgnored, thisDirIgnored] })
+
+    await assertFileMatch(path.join(dirToCopy, thisFileCopied), path.join(tempDir, copyDirName, thisFileCopied))
+    await assertFileMatch(path.join(dirToCopy, thisFileCopiedSubDir), path.join(tempDir, copyDirName, thisFileCopiedSubDir))
+
+    const fileShouldNotExist1 = path.join(destination, thisFileIgnored)
+    const fileShouldNotExist2 = path.join(destination, thisDirIgnored, thisFileIgnored)
+    assert.strictEqual(fs.existsSync(fileShouldNotExist1), false, `file should not exist: ${fileShouldNotExist1}`)
+    assert.strictEqual(fs.existsSync(fileShouldNotExist2), false, `file should not exist: ${fileShouldNotExist2}`)
+  })
+})
+
+async function assertFileMatch(sourcePath: string, destPath: string) {
+  if (!fs.existsSync(sourcePath)) {
+    throw new Error('assertFile used incorrectly - sourcePath does not exist')
+  }
+  const sourceContents = await fsp.readFile(sourcePath, 'utf-8')
+  if (!fs.existsSync(destPath)) {
+    assert.fail(`expected file did not exist: ${destPath}`)
+  }
+  const destContents = await fsp.readFile(destPath, 'utf-8')
+  assert.strictEqual(destContents, sourceContents, 'file contents should match')
+}

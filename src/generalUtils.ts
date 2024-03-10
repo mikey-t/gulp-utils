@@ -296,16 +296,23 @@ export async function emptyDirectory(directoryToEmpty: string, options?: Partial
   await dir.close()
 }
 
+export interface CopyDirectoryOptions {
+  exclusions?: string[]
+}
+
 /**
- * Copies the contents of a directory to another directory (not including the top-level directory itself).
+ * Copies the contents of a directory to another directory (not including the top-level directory itself). Optionally
+ * pass a list of file or directory names to skip using `CopyDirectoryOptions` -> `exclusions`.
  * 
  * If the destination directory does not exist, it will be created.
  * @param sourceDirectory Directory to copy from
  * @param destinationDirectory Directory to copy to
  */
-export async function copyDirectoryContents(sourceDirectory: string, destinationDirectory: string) {
+export async function copyDirectoryContents(sourceDirectory: string, destinationDirectory: string, options?: Partial<CopyDirectoryOptions>) {
   requireString('sourceDirectory', sourceDirectory)
   requireString('destinationDirectory', destinationDirectory)
+
+  const exclusions = options?.exclusions ?? []
 
   if (!fs.existsSync(sourceDirectory)) {
     throw new Error(`sourceDirectory directory does not exist: ${sourceDirectory}`)
@@ -331,10 +338,13 @@ export async function copyDirectoryContents(sourceDirectory: string, destination
     const sourcePath = path.join(sourceDirectory, dirEntry.name)
     const destPath = path.join(destinationDirectory, dirEntry.name)
 
-    if (dirEntry.isDirectory()) {
-      await copyDirectoryContents(sourcePath, destPath)
-    } else {
-      await fsp.copyFile(sourcePath, destPath)
+
+    if (!exclusions.some(exclusion => destPath.endsWith(exclusion))) {
+      if (dirEntry.isDirectory()) {
+        await copyDirectoryContents(sourcePath, destPath, { exclusions })
+      } else {
+        await fsp.copyFile(sourcePath, destPath)
+      }
     }
 
     dirEntry = await dir.read()
