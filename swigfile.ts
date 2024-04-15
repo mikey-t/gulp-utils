@@ -35,6 +35,20 @@ export async function lint() {
 
 // See DevNotes.md for documentation and examples
 export async function test(fullOverride = false) {
+  if (argPassed('help')) {
+    log(`test options:`)
+    log(`  (no options) - normal tests only`)
+    log(`  n            - normal tests`)
+    log(`  full         - all tests and collect code coverage collection (slow, requires admin)`)
+    log(`  i            - integration tests (has additional pre-requisites)`)
+    log(`  cert         - certificate management tests (slow, requires admin)`)
+    log(`  tar          - tarball tests (slow)`)
+    log(`  w            - run tests in watch mode (experimental - cannot be used with test coverage)`)
+    log(`  o            - run only tests marked with "only"`)
+    log(`  c            - collect test coverage`)
+    return
+  }
+  
   const normalTestFiles = await getTestFilesByCategory('normal')
   const integrationTestFiles = await getTestFilesByCategory('integration')
   const certTestFile = './test/categories/other/certUtils.test.ts'

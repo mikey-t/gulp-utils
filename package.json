@@ -1,13 +1,13 @@
 {
   "name": "@mikeyt23/node-cli-utils",
-  "version": "2.0.35",
+  "version": "2.0.36",
   "description": "Some node cli utility functions",
   "author": "Mike Thompson",
   "license": "MIT",
   "homepage": "https://github.com/mikey-t/node-cli-utils",
   "repository": {
     "type": "git",
-    "url": "https://github.com/mikey-t/node-cli-utils.git"
+    "url": "git+https://github.com/mikey-t/node-cli-utils.git"
   },
   "type": "module",
   "scripts": {

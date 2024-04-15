@@ -12,6 +12,7 @@ import { copyEnv, dictionaryToEnvFileString, getEnvAsDictionary, simpleSpawnAsyn
 // For JSDoc links
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { winInstallCert, winUninstallCert } from './certUtils.js'
+import { deletePnpmDir, getVoltaAppDir, removePnpmFromJsonFiles, removePnpmFromUserPlatformJson } from './voltaLogic.js'
 
 export type Func<T> = (...args: unknown[]) => T
 export type AsyncFunc<T> = (...args: unknown[]) => Promise<T>
@@ -1442,5 +1443,26 @@ export function splitByWhitespace(input: string): string[] {
   if (!input) {
     return []
   }
-  return input.match(/\S+/g) || []
+  return input.match(/\S+/g) ?? []
+}
+
+/**
+ * Volta pnpm support is currently experimental. There is no current way to consistently uninstall or update pnpm if managed by Volta.
+ * Call this method to clean out pnpm from all Volta settings. If reinstalling pnpm through Volta, be sure to restart your terminal
+ * session after running this uninstall script.
+ */
+export async function winUninstallPnpmFromVolta() {
+  if (!isPlatformWindows()) {
+    throw new Error('This script is only supported on Windows')
+  }
+
+  console.log('- uninstalling pnpm from volta')
+
+  const voltaAppDir = getVoltaAppDir()
+
+  await removePnpmFromUserPlatformJson(voltaAppDir)
+  removePnpmFromJsonFiles(path.join(voltaAppDir, 'tools/user/bins'))
+  removePnpmFromJsonFiles(path.join(voltaAppDir, 'tools/user/packages'))
+  await deletePnpmDir(path.join(voltaAppDir, 'tools/image/pnpm'))
+  await deletePnpmDir(path.join(voltaAppDir, 'tools/inventory/pnpm'))
 }
