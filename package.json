@@ -133,7 +133,7 @@
     "tsx": "^4.7.2",
     "typedoc": "^0.25.13",
     "typedoc-plugin-missing-exports": "^2.2.0",
-    "typescript": "^5.4.5"
+    "typescript": "5.3"
   },
   "dependencies": {
     "axios": "^1.6.8"
